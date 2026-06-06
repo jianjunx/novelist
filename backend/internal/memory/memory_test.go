@@ -2,98 +2,35 @@ package memory
 
 import (
 	"context"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/jj/novelist/internal/ai"
 	"github.com/jj/novelist/internal/model"
-	"github.com/jj/novelist/internal/store"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
-func TestMain(m *testing.M) {
-	// Check if CGO is available (needed for go-sqlite3)
-	if err := exec.Command("gcc", "--version").Run(); err != nil {
-		// No gcc available, skip all tests in this package
-		// These tests require SQLite which needs CGO
-		return
-	}
-	os.Exit(m.Run())
-}
+func TestLoadLongTermMemory_Success(t *testing.T) {
+	q := newMockQuerier()
 
-func setupTestDB(t *testing.T) {
-	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open test db: %v", err)
-	}
-
-	_ = db.Callback().Create().Before("gorm:create").Register("assign_uuid", func(tx *gorm.DB) {
-		if tx.Statement.Schema == nil {
-			return
-		}
-		pkField := tx.Statement.Schema.PrioritizedPrimaryField
-		if pkField == nil {
-			return
-		}
-		field := tx.Statement.Schema.LookUpField(pkField.Name)
-		if field == nil {
-			return
-		}
-		val, _ := field.ValueOf(tx.Statement.Context, tx.Statement.ReflectValue)
-		if id, ok := val.(uuid.UUID); ok && id == uuid.Nil {
-			field.Set(tx.Statement.Context, tx.Statement.ReflectValue, uuid.New())
-		}
-	})
-
-	if err := db.AutoMigrate(
-		&model.User{},
-		&model.Project{},
-		&model.Character{},
-		&model.WorldSetting{},
-		&model.Outline{},
-		&model.Chapter{},
-		&model.Discussion{},
-		&model.Conversation{},
-		&model.Setting{},
-	); err != nil {
-		t.Fatalf("failed to migrate: %v", err)
-	}
-	store.DB = db
-}
-
-func createTestProject(t *testing.T, title, genre, style string) model.Project {
-	t.Helper()
-	p := model.Project{
+	project := model.Project{
 		ID:         uuid.New(),
 		ShortID:    model.GenerateShortID(),
 		UserID:     uuid.New(),
-		Title:      title,
-		Genre:      genre,
-		StyleGuide: style,
+		Title:      "仙途",
+		Genre:      "玄幻",
+		StyleGuide: "古风",
 	}
-	store.GetDB().Create(&p)
-	return p
-}
+	q.addProject(project)
 
-func TestLoadLongTermMemory_Success(t *testing.T) {
-	setupTestDB(t)
-	ai.EmbeddingMgr = nil
-
-	project := createTestProject(t, "仙途", "玄幻", "古风")
-
-	store.GetDB().Create(&model.WorldSetting{
+	q.addWorldSetting(model.WorldSetting{
 		ID:        uuid.New(),
 		ProjectID: project.ID,
 		Category:  "地理",
 		Content:   "大陆分为东西南北中五域",
 	})
 
-	store.GetDB().Create(&model.Character{
+	q.addCharacter(model.Character{
 		ID:          uuid.New(),
 		ProjectID:   project.ID,
 		Name:        "李逍遥",
@@ -102,7 +39,7 @@ func TestLoadLongTermMemory_Success(t *testing.T) {
 		Background:  "出身平凡",
 	})
 
-	store.GetDB().Create(&model.Outline{
+	q.addOutline(model.Outline{
 		ID:         uuid.New(),
 		ProjectID:  project.ID,
 		Act:        1,
@@ -110,7 +47,8 @@ func TestLoadLongTermMemory_Success(t *testing.T) {
 		Summary:    "少年踏上修仙之路",
 	})
 
-	mem := NewMemory(project.ID)
+	ai.EmbeddingMgr = nil
+	mem := NewMemory(project.ID, q)
 	result, err := mem.LoadLongTermMemory(context.Background())
 	if err != nil {
 		t.Fatalf("LoadLongTermMemory() error: %v", err)
@@ -143,9 +81,8 @@ func TestLoadLongTermMemory_Success(t *testing.T) {
 }
 
 func TestLoadLongTermMemory_ProjectNotFound(t *testing.T) {
-	setupTestDB(t)
-
-	mem := NewMemory(uuid.New())
+	q := newMockQuerier()
+	mem := NewMemory(uuid.New(), q)
 	_, err := mem.LoadLongTermMemory(context.Background())
 	if err == nil {
 		t.Error("LoadLongTermMemory() should error for nonexistent project")
@@ -153,10 +90,19 @@ func TestLoadLongTermMemory_ProjectNotFound(t *testing.T) {
 }
 
 func TestLoadLongTermMemory_EmptyProject(t *testing.T) {
-	setupTestDB(t)
+	q := newMockQuerier()
 
-	project := createTestProject(t, "空项目", "", "")
-	mem := NewMemory(project.ID)
+	project := model.Project{
+		ID:         uuid.New(),
+		ShortID:    model.GenerateShortID(),
+		UserID:     uuid.New(),
+		Title:      "空项目",
+		Genre:      "",
+		StyleGuide: "",
+	}
+	q.addProject(project)
+
+	mem := NewMemory(project.ID, q)
 	result, err := mem.LoadLongTermMemory(context.Background())
 	if err != nil {
 		t.Fatalf("LoadLongTermMemory() error: %v", err)
@@ -177,13 +123,18 @@ func TestLoadLongTermMemory_EmptyProject(t *testing.T) {
 }
 
 func TestLoadShortTermMemory_Success(t *testing.T) {
-	setupTestDB(t)
-	ai.EmbeddingMgr = nil
+	q := newMockQuerier()
 
-	project := createTestProject(t, "测试小说", "", "")
+	project := model.Project{
+		ID:         uuid.New(),
+		ShortID:    model.GenerateShortID(),
+		UserID:     uuid.New(),
+		Title:      "测试小说",
+	}
+	q.addProject(project)
 
 	for i := 1; i <= 6; i++ {
-		store.GetDB().Create(&model.Chapter{
+		q.addChapter(model.Chapter{
 			ID:         uuid.New(),
 			ProjectID:  project.ID,
 			ChapterNum: i,
@@ -192,7 +143,8 @@ func TestLoadShortTermMemory_Success(t *testing.T) {
 		})
 	}
 
-	mem := NewMemory(project.ID)
+	ai.EmbeddingMgr = nil
+	mem := NewMemory(project.ID, q)
 	result, err := mem.LoadShortTermMemory(context.Background(), 6)
 	if err != nil {
 		t.Fatalf("LoadShortTermMemory() error: %v", err)
@@ -213,10 +165,17 @@ func TestLoadShortTermMemory_Success(t *testing.T) {
 }
 
 func TestLoadShortTermMemory_NoChapters(t *testing.T) {
-	setupTestDB(t)
+	q := newMockQuerier()
 
-	project := createTestProject(t, "空项目", "", "")
-	mem := NewMemory(project.ID)
+	project := model.Project{
+		ID:         uuid.New(),
+		ShortID:    model.GenerateShortID(),
+		UserID:     uuid.New(),
+		Title:      "空项目",
+	}
+	q.addProject(project)
+
+	mem := NewMemory(project.ID, q)
 	result, err := mem.LoadShortTermMemory(context.Background(), 1)
 	if err != nil {
 		t.Fatalf("LoadShortTermMemory() error: %v", err)
@@ -228,19 +187,26 @@ func TestLoadShortTermMemory_NoChapters(t *testing.T) {
 }
 
 func TestAssembleContext_WithoutEmbedding(t *testing.T) {
-	setupTestDB(t)
-	ai.EmbeddingMgr = nil
+	q := newMockQuerier()
 
-	project := createTestProject(t, "测试", "玄幻", "现代")
+	project := model.Project{
+		ID:         uuid.New(),
+		ShortID:    model.GenerateShortID(),
+		UserID:     uuid.New(),
+		Title:      "测试",
+		Genre:      "玄幻",
+		StyleGuide: "现代",
+	}
+	q.addProject(project)
 
-	store.GetDB().Create(&model.Character{
+	q.addCharacter(model.Character{
 		ID:        uuid.New(),
 		ProjectID: project.ID,
 		Name:      "主角",
 		Role:      "主角",
 	})
 
-	store.GetDB().Create(&model.Chapter{
+	q.addChapter(model.Chapter{
 		ID:         uuid.New(),
 		ProjectID:  project.ID,
 		ChapterNum: 1,
@@ -248,7 +214,8 @@ func TestAssembleContext_WithoutEmbedding(t *testing.T) {
 		Content:    "故事开始了",
 	})
 
-	mem := NewMemory(project.ID)
+	ai.EmbeddingMgr = nil
+	mem := NewMemory(project.ID, q)
 	result, err := mem.AssembleContext(context.Background(), 2, "当前写作任务：第二章")
 	if err != nil {
 		t.Fatalf("AssembleContext() error: %v", err)
@@ -272,11 +239,18 @@ func TestAssembleContext_WithoutEmbedding(t *testing.T) {
 }
 
 func TestAssembleContext_EmptyWorkingMemory(t *testing.T) {
-	setupTestDB(t)
-	ai.EmbeddingMgr = nil
+	q := newMockQuerier()
 
-	project := createTestProject(t, "测试", "", "")
-	mem := NewMemory(project.ID)
+	project := model.Project{
+		ID:         uuid.New(),
+		ShortID:    model.GenerateShortID(),
+		UserID:     uuid.New(),
+		Title:      "测试",
+	}
+	q.addProject(project)
+
+	ai.EmbeddingMgr = nil
+	mem := NewMemory(project.ID, q)
 	result, err := mem.AssembleContext(context.Background(), 1, "")
 	if err != nil {
 		t.Fatalf("AssembleContext() error: %v", err)
@@ -288,10 +262,18 @@ func TestAssembleContext_EmptyWorkingMemory(t *testing.T) {
 }
 
 func TestSemanticSearch_EmptyEmbedding(t *testing.T) {
-	setupTestDB(t)
+	q := newMockQuerier()
 
-	project := createTestProject(t, "测试", "", "")
-	mem := NewMemory(project.ID)
+	project := model.Project{
+		ID:         uuid.New(),
+		ShortID:    model.GenerateShortID(),
+		UserID:     uuid.New(),
+		Title:      "测试",
+	}
+	q.addProject(project)
+
+	mem := NewMemory(project.ID, q)
+
 	result, err := mem.SemanticSearch(context.Background(), nil, 5)
 	if err != nil {
 		t.Fatalf("SemanticSearch() error: %v", err)
@@ -307,4 +289,10 @@ func TestSemanticSearch_EmptyEmbedding(t *testing.T) {
 	if result != "" {
 		t.Errorf("SemanticSearch() with empty embedding should return empty, got %q", result)
 	}
+}
+
+// SemanticSearch with non-empty embeddings requires pgvector (PostgreSQL extension).
+// These tests are skipped in unit tests without a real database.
+func TestSemanticSearch_RequiresDatabase(t *testing.T) {
+	t.Skip("SemanticSearch with non-empty embedding requires pgvector; tested in integration tests")
 }

@@ -3,36 +3,90 @@ package memory
 import (
 	"context"
 	"fmt"
-
 	"github.com/google/uuid"
 	"github.com/jj/novelist/internal/ai"
 	"github.com/jj/novelist/internal/model"
 	"github.com/jj/novelist/internal/store"
 )
 
-type Memory struct {
-	ProjectID uuid.UUID
+// Querier abstracts database queries so Memory can be tested without SQLite/CGO.
+type Querier interface {
+	GetProject(id uuid.UUID) (*model.Project, error)
+	GetWorldSettings(projectID uuid.UUID) ([]model.WorldSetting, error)
+	GetCharacters(projectID uuid.UUID) ([]model.Character, error)
+	GetOutlines(projectID uuid.UUID) ([]model.Outline, error)
+	GetChaptersBefore(projectID uuid.UUID, chapterNum int, limit int) ([]model.Chapter, error)
+	GetChaptersWithEmbedding(projectID uuid.UUID, limit int) ([]model.Character, []model.WorldSetting, []model.Outline, []model.Chapter, error)
 }
 
-func NewMemory(projectID uuid.UUID) *Memory {
-	return &Memory{ProjectID: projectID}
+// StoreQuerier wraps the real GORM store for production use.
+type StoreQuerier struct{}
+
+func (s *StoreQuerier) GetProject(id uuid.UUID) (*model.Project, error) {
+	var p model.Project
+	if err := store.GetDB().Where("id = ?", id).First(&p).Error; err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
+func (s *StoreQuerier) GetWorldSettings(projectID uuid.UUID) ([]model.WorldSetting, error) {
+	var settings []model.WorldSetting
+	store.GetDB().Where("project_id = ?", projectID).Find(&settings)
+	return settings, nil
+}
+
+func (s *StoreQuerier) GetCharacters(projectID uuid.UUID) ([]model.Character, error) {
+	var characters []model.Character
+	store.GetDB().Where("project_id = ?", projectID).Find(&characters)
+	return characters, nil
+}
+
+func (s *StoreQuerier) GetOutlines(projectID uuid.UUID) ([]model.Outline, error) {
+	var outlines []model.Outline
+	store.GetDB().Where("project_id = ?", projectID).Order("act, chapter_num").Find(&outlines)
+	return outlines, nil
+}
+
+func (s *StoreQuerier) GetChaptersBefore(projectID uuid.UUID, chapterNum int, limit int) ([]model.Chapter, error) {
+	var chapters []model.Chapter
+	store.GetDB().Where("project_id = ? AND chapter_num < ?", projectID, chapterNum).
+		Order("chapter_num DESC").Limit(limit).Find(&chapters)
+	return chapters, nil
+}
+
+func (s *StoreQuerier) GetChaptersWithEmbedding(projectID uuid.UUID, limit int) ([]model.Character, []model.WorldSetting, []model.Outline, []model.Chapter, error) {
+	embeddingStr := store.FormatVector(nil) // only used when embedding is non-nil
+	_ = embeddingStr
+	// This method is only called from SemanticSearch which needs pgvector.
+	// In production, this would use vector distance ordering.
+	// For non-embedding path, this is never called.
+	return nil, nil, nil, nil, nil
+}
+
+type Memory struct {
+	ProjectID uuid.UUID
+	q         Querier
+}
+
+func NewMemory(projectID uuid.UUID, q ...Querier) *Memory {
+	var querier Querier = &StoreQuerier{}
+	if len(q) > 0 && q[0] != nil {
+		querier = q[0]
+	}
+	return &Memory{ProjectID: projectID, q: querier}
 }
 
 // LoadLongTermMemory loads project info, world settings, outlines, and characters
 func (m *Memory) LoadLongTermMemory(ctx context.Context) (string, error) {
-	var project model.Project
-	if err := store.GetDB().Where("id = ?", m.ProjectID).First(&project).Error; err != nil {
+	project, err := m.q.GetProject(m.ProjectID)
+	if err != nil {
 		return "", fmt.Errorf("project not found: %w", err)
 	}
 
-	var settings []model.WorldSetting
-	store.GetDB().Where("project_id = ?", m.ProjectID).Find(&settings)
-
-	var outlines []model.Outline
-	store.GetDB().Where("project_id = ?", m.ProjectID).Order("act, chapter_num").Find(&outlines)
-
-	var characters []model.Character
-	store.GetDB().Where("project_id = ?", m.ProjectID).Find(&characters)
+	settings, _ := m.q.GetWorldSettings(m.ProjectID)
+	outlines, _ := m.q.GetOutlines(m.ProjectID)
+	characters, _ := m.q.GetCharacters(m.ProjectID)
 
 	result := fmt.Sprintf("## 项目信息\n标题: %s\n类型: %s\n风格: %s\n\n", project.Title, project.Genre, project.StyleGuide)
 
@@ -56,9 +110,7 @@ func (m *Memory) LoadLongTermMemory(ctx context.Context) (string, error) {
 
 // LoadShortTermMemory loads recent chapters
 func (m *Memory) LoadShortTermMemory(ctx context.Context, currentChapterNum int) (string, error) {
-	var chapters []model.Chapter
-	store.GetDB().Where("project_id = ? AND chapter_num < ?", m.ProjectID, currentChapterNum).
-		Order("chapter_num DESC").Limit(5).Find(&chapters)
+	chapters, _ := m.q.GetChaptersBefore(m.ProjectID, currentChapterNum, 5)
 
 	result := "## 近期章节\n"
 	for i := len(chapters) - 1; i >= 0; i-- {
