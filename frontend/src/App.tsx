@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useAuthStore } from './stores/authStore'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import Creator from './pages/Creator'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore()
@@ -17,6 +18,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="/projects/:projectId/creator" element={<PrivateRoute><Creator /></PrivateRoute>} />
       </Routes>
     </div>
   )
