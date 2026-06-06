@@ -700,25 +700,31 @@ novelist/
 │   ├── internal/
 │   │   ├── api/             # HTTP处理器
 │   │   ├── auth/            # JWT认证中间件
-│   │   ├── agent/           # Agent定义（系统提示、调用封装）
-│   │   │   ├── prompts.go
-│   │   │   └── agent.go
-│   │   ├── ai/              # Eino模型管理
-│   │   │   └── model.go
-│   │   ├── memory/          # 记忆系统（含pgvector语义检索）
-│   │   │   └── memory.go
+│   │   ├── agent/           # Agent定义（基于Eino）
+│   │   │   ├── creator.go
+│   │   │   ├── writer.go
+│   │   │   ├── editor.go
+│   │   │   ├── reader.go
+│   │   │   └── critic.go
 │   │   ├── orchestrator/    # 编排器与工作流引擎
 │   │   ├── model/           # 数据模型
+│   │   ├── adapter/         # LLM适配层
 │   │   └── store/           # 数据库访问
 │   ├── migrations/          # 数据库迁移
 │   └── go.mod
 ├── frontend/
 │   ├── src/
-│   │   ├── api/             # API客户端
-│   │   ├── stores/          # Zustand状态管理
-│   │   ├── pages/           # 页面组件
-│   │   ├── components/      # 通用组件
-│   │   └── hooks/           # 自定义Hook
+│   │   ├── pages/
+│   │   │   ├── Login.tsx
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Creator.tsx
+│   │   │   ├── ChapterEditor.tsx
+│   │   │   └── Settings.tsx
+│   │   ├── components/
+│   │   │   ├── ProjectManager/
+│   │   │   ├── Editor/
+│   │   │   └── Discussion/
+│   │   └── hooks/
 │   └── package.json
 └── docs/
 ```
