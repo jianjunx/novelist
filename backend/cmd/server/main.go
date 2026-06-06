@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jj/novelist/internal/ai"
 	"github.com/jj/novelist/internal/api"
 	"github.com/jj/novelist/internal/auth"
 	"github.com/jj/novelist/internal/config"
@@ -15,6 +16,7 @@ func main() {
 	cfg := config.Load()
 	auth.SetSecret(cfg.JWTSecret)
 	store.InitDB(cfg.DatabaseURL)
+	ai.InitModelManager(cfg)
 
 	r := gin.Default()
 	api.SetupRouter(r)
