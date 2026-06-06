@@ -9,9 +9,9 @@ export default function ChapterList() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const {
-    currentProject, chapters, isLoading, isGenerating, isReviewing,
+    currentProject, chapters, isLoading, isGenerating, isReviewing, isExpanding,
     reviewResult, fetchProject, fetchChapters, generateChapter,
-    reviewAndRevise, clearReviewResult,
+    reviewAndRevise, expandOutlines, clearReviewResult,
   } = useProjectStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showReview, setShowReview] = useState(false)
@@ -152,6 +152,30 @@ export default function ChapterList() {
                   </button>
                 )
               })}
+
+              {/* Expand outlines button */}
+              <button
+                onClick={() => expandOutlines(projectId!)}
+                disabled={isExpanding}
+                className="w-full mt-3 px-4 py-3 border-2 border-dashed border-parchment-deep/40 rounded-lg text-warm-gray hover:text-amber-dark hover:border-amber/30 transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isExpanding ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="text-sm">生成中...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    <span className="text-sm font-literary">扩写大纲</span>
+                  </>
+                )}
+              </button>
             </div>
           </aside>
 

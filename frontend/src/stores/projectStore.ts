@@ -57,6 +57,7 @@ interface ProjectState {
   isLoading: boolean
   isGenerating: boolean
   isReviewing: boolean
+  isExpanding: boolean
   reviewResult: ReviewResult | null
   fetchProjects: () => Promise<void>
   fetchProject: (id: string) => Promise<void>
@@ -64,6 +65,7 @@ interface ProjectState {
   createProject: (d: Partial<Project>) => Promise<Project>
   generateChapter: (chapterId: string) => Promise<ReviewResult>
   reviewAndRevise: (chapterId: string) => Promise<ReviewResult>
+  expandOutlines: (projectId: string) => Promise<void>
   setCurrentProject: (p: Project | null) => void
   clearReviewResult: () => void
 }
@@ -75,6 +77,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   isLoading: false,
   isGenerating: false,
   isReviewing: false,
+  isExpanding: false,
   reviewResult: null,
   fetchProjects: async () => {
     set({ isLoading: true })
@@ -124,6 +127,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return result
     } finally {
       set({ isReviewing: false })
+    }
+  },
+  expandOutlines: async (projectId) => {
+    set({ isExpanding: true })
+    try {
+      await api.post(`/projects/${projectId}/expand-outlines`)
+      await get().fetchChapters(projectId)
+    } finally {
+      set({ isExpanding: false })
     }
   },
   setCurrentProject: (p) => set({ currentProject: p }),

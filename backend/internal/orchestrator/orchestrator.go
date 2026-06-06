@@ -224,6 +224,87 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 	return saved, nil
 }
 
+// ExpandOutlines generates additional chapter outlines for a project
+func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) (*SavedIDs, error) {
+	db := store.GetDB()
+
+	// Load existing context
+	mem := memory.NewMemory(projectID)
+	contextStr, err := mem.LoadLongTermMemory(ctx)
+	if err != nil {
+		contextStr = ""
+	}
+
+	// Get existing chapter count
+	var existingChapters []model.Chapter
+	db.Where("project_id = ?", projectID).Order("chapter_num").Find(&existingChapters)
+	existingCount := len(existingChapters)
+
+	// Get project info
+	var project model.Project
+	db.Where("id = ?", projectID).First(&project)
+
+	prompt := fmt.Sprintf(`你正在为小说《%s》扩写后续章节大纲。
+
+已有 %d 章大纲：
+%s
+
+请为接下来的内容生成 3-5 个新章节大纲，继续故事发展。章节编号从 %d 开始。
+
+必须以JSON格式输出：
+{"outlines": [{"act": %d, "chapter_num": %d, "summary": "章节概要"}]}`,
+		project.Title, existingCount, contextStr,
+		existingCount+1, 2, existingCount+1)
+
+	messages := []ai.Message{{Role: "user", Content: prompt}}
+	resp, err := agent.Chat(ctx, agent.RoleCreator, messages)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse response
+	jsonStr, ok := extractJSON(resp)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse AI response")
+	}
+
+	var result struct {
+		Outlines []OutlineData `json:"outlines"`
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse outlines: %w", err)
+	}
+
+	// Save new outlines and create chapters
+	saved := &SavedIDs{}
+	for _, o := range result.Outlines {
+		outline := model.Outline{
+			ProjectID:  projectID,
+			Act:        o.Act,
+			ChapterNum: o.ChapterNum,
+			Summary:    o.Summary,
+			Status:     "draft",
+		}
+		if err := db.Create(&outline).Error; err == nil {
+			saved.OutlineIDs = append(saved.OutlineIDs, outline.ID)
+
+			chapter := model.Chapter{
+				ProjectID:  projectID,
+				OutlineID:  &outline.ID,
+				ChapterNum: o.ChapterNum,
+				Title:      fmt.Sprintf("第%d章", o.ChapterNum),
+				Status:     "draft",
+			}
+			if err := db.Create(&chapter).Error; err == nil {
+				saved.ChapterIDs = append(saved.ChapterIDs, chapter.ID)
+			}
+		}
+	}
+	saved.ChapterCount = len(saved.ChapterIDs)
+
+	return saved, nil
+}
+
 // GenerateChapter generates chapter content using Writer Agent
 func (o *Orchestrator) GenerateChapter(ctx context.Context, chapterID uuid.UUID) (string, error) {
 	var chapter model.Chapter

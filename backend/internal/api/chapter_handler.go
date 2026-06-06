@@ -36,7 +36,7 @@ func GetChapters(c *gin.Context) {
 
 	// Load outlines for this project
 	var outlines []model.Outline
-	store.GetDB().Where("project_id = ?", c.Param("id")).Find(&outlines)
+	store.GetDB().Where("project_id = ?", project.ID).Find(&outlines)
 	outlineMap := make(map[uuid.UUID]string)
 	for _, o := range outlines {
 		outlineMap[o.ID] = o.Summary
