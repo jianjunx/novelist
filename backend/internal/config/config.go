@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+    "log"
+    "os"
+)
 
 type Config struct {
     DatabaseURL   string
@@ -11,11 +14,16 @@ type Config struct {
 }
 
 func Load() *Config {
+    jwtSecret := os.Getenv("JWT_SECRET")
+    if jwtSecret == "" {
+        log.Fatal("JWT_SECRET environment variable is required")
+    }
+
     return &Config{
         DatabaseURL:   getEnv("DATABASE_URL", "postgres://localhost:5432/novelist?sslmode=disable"),
-        JWTSecret:     getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+        JWTSecret:     jwtSecret,
         ServerPort:    getEnv("SERVER_PORT", "8080"),
-        DeepSeekKey:   getEnv("DEEPSEEK_API_KEY", ""),
+        DeepSeekKey:   os.Getenv("DEEPSEEK_API_KEY"),
         DeepSeekModel: getEnv("DEEPSEEK_MODEL", "deepseek-chat"),
     }
 }

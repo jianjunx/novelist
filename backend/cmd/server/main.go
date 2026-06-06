@@ -2,18 +2,18 @@ package main
 
 import (
     "log"
+    "net/http"
     "github.com/jj/novelist/internal/config"
     "github.com/gin-gonic/gin"
 )
 
 func main() {
     cfg := config.Load()
-    _ = cfg
 
     r := gin.Default()
 
     r.GET("/health", func(c *gin.Context) {
-        c.JSON(200, gin.H{"status": "ok"})
+        c.JSON(http.StatusOK, gin.H{"status": "ok"})
     })
 
     log.Printf("Server starting on port %s", cfg.ServerPort)
