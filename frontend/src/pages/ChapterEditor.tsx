@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import DiscussionPanel from '../components/DiscussionPanel'
+import TipTapEditor from '../components/TipTapEditor'
 
 export default function ChapterEditor() {
   const { chapterId } = useParams<{ chapterId: string }>()
@@ -31,10 +32,9 @@ export default function ChapterEditor() {
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow p-6">
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="w-full h-96 px-4 py-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <TipTapEditor
+            content={content}
+            onChange={setContent}
             placeholder="开始写作..."
           />
           <div className="mt-4 text-sm text-gray-500">
