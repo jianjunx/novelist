@@ -15,6 +15,7 @@ interface ProjectState {
   currentProject: Project | null
   isLoading: boolean
   fetchProjects: () => Promise<void>
+  fetchProject: (id: string) => Promise<void>
   createProject: (d: Partial<Project>) => Promise<Project>
   setCurrentProject: (p: Project | null) => void
 }
@@ -27,6 +28,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ isLoading: true })
     const { data } = await api.get('/projects')
     set({ projects: data, isLoading: false })
+  },
+  fetchProject: async (id) => {
+    const { data } = await api.get(`/projects/${id}`)
+    set({ currentProject: data })
   },
   createProject: async (d) => {
     const { data } = await api.post('/projects', d)

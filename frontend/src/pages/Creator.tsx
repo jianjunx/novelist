@@ -7,11 +7,11 @@ export default function Creator() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const { messages, isStreaming, sendMessage, clearMessages } = useAgentStore()
-  const { currentProject, fetchProjects } = useProjectStore()
+  const { currentProject, fetchProject } = useProjectStore()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { if (projectId) fetchProjects(); return () => clearMessages() }, [projectId])
+  useEffect(() => { if (projectId) fetchProject(projectId); return () => clearMessages() }, [projectId])
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   const handleSend = async () => {
