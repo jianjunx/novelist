@@ -68,10 +68,23 @@ psql -d novelist
 JWT_SECRET=your-secret-key-here
 DEEPSEEK_API_KEY=your-deepseek-api-key
 
-# 可选
+# 数据库（两种方式二选一）
 DATABASE_URL=postgres://localhost:5432/novelist?sslmode=disable
+# 或者分开指定：
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your-password
+DB_NAME=novelist
+
+# 可选
 SERVER_PORT=8080
 DEEPSEEK_MODEL=deepseek-chat
+
+# Embedding（语义检索需要）
+OPENAI_API_KEY=your-openai-key
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_BASE_URL=https://api.openai.com/v1
 ```
 
 ## 项目结构
@@ -103,15 +116,22 @@ novelist/
 
 ### Agent系统
 
-- 5个Agent角色：Creator, Writer, Editor, Reader, Critic
+- 6个Agent角色：Creator, Writer, Editor, Reader, Critic, Reviser
+  - Creator：小说构思（题材→风格→人物→世界观→大纲）
+  - Writer：章节生成（含反AI味指南）
+  - Editor：审查逻辑、文笔、节奏、风格、自然度
+  - Reader：第一人称读者视角反馈
+  - Critic：主题、人物、叙事的文学分析
+  - Reviser：根据 Editor/Reader/Critic 反馈修订章节
 - 系统提示在 `backend/internal/agent/prompts.go`
 - Agent调用封装在 `backend/internal/agent/agent.go`
 - 使用Eino框架的DeepSeek模型
 
 ### 记忆系统
 
-- 三层记忆：长期（项目设定）、短期（近期章节）、工作（当前任务）
-- 使用pgvector进行语义检索
+- 三层记忆：长期（项目设定+人物+世界观+大纲）、短期（近5章）、工作（当前任务上下文）
+- 使用pgvector进行语义检索（characters/world_settings/outlines/chapters四类）
+- embedding 生成通过 OpenAI 兼容 API（text-embedding-3-small，1536维）
 - 在 `backend/internal/memory/memory.go` 实现
 
 ### 编排器
@@ -125,21 +145,22 @@ novelist/
 - 认证路由：`/api/auth/*`
 - 项目路由：`/api/projects/*`
 - AI操作路由：`/api/creator/chat`, `/api/chapters/:id/*`
-- WebSocket：`/ws`
+- WebSocket：`/api/ws`
 
 ## 数据库表
 
 - `users` - 用户
-- `projects` - 小说项目
-- `characters` - 人物档案
+- `projects` - 小说项目（含 `short_id` 短ID字段）
+- `characters` - 人物档案（含 `embedding vector(1536)`）
 - `world_settings` - 世界观设定
 - `outlines` - 故事大纲
 - `chapters` - 章节内容
 - `discussions` - 讨论记录
 - `conversations` - 对话记录
-- `settings` - 用户设置
+- `settings` - 用户设置（含 API Key 配置、讨论轮数、模型选择等）
 
 所有表使用UUID主键，支持pgvector向量嵌入（1536维）。
+迁移文件：`001_init.sql`（基础表）、`002_add_short_id.sql`（项目短ID）。
 
 ## 前端状态管理
 
@@ -154,5 +175,5 @@ novelist/
 2. PostgreSQL需要安装pgvector扩展
 3. JWT_SECRET必须设置，不能使用默认值
 4. DeepSeek API Key必须设置才能使用AI功能
-5. 前端开发服务器端口3000，后端8080
+5. 前端开发服务器端口3000，后端8080（vite代理转发）
 6. 前端通过Vite代理转发API请求到后端

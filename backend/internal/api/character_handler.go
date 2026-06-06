@@ -53,7 +53,7 @@ func CreateCharacter(c *gin.Context) {
 		Appearance:    req.Appearance,
 		Relationships: datatypes.JSON(relJSON),
 	}
-	if err := store.GetDB().Create(&character).Error; err != nil {
+	if err := store.CreateCharacter(c.Request.Context(), &character); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create character"})
 		return
 	}
@@ -73,14 +73,17 @@ func UpdateCharacter(c *gin.Context) {
 		return
 	}
 	relJSON, _ := json.Marshal(req.Relationships)
-	store.GetDB().Model(&character).Updates(map[string]interface{}{
+	if err := store.UpdateCharacter(c.Request.Context(), character.ID, map[string]interface{}{
 		"name":          req.Name,
 		"role":          req.Role,
 		"personality":   req.Personality,
 		"background":    req.Background,
 		"appearance":    req.Appearance,
 		"relationships": datatypes.JSON(relJSON),
-	})
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update character"})
+		return
+	}
 	c.JSON(http.StatusOK, character)
 }
 

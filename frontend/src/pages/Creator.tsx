@@ -8,13 +8,19 @@ import { useProjectStore } from '../stores/projectStore'
 export default function Creator() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
-  const { messages, isStreaming, sendMessage, clearMessages, savedIDs } = useAgentStore()
+  const { messages, isStreaming, sendMessage, loadConversations, clearMessages, savedIDs } = useAgentStore()
   const { currentProject, fetchProject } = useProjectStore()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { if (projectId) fetchProject(projectId); return () => clearMessages() }, [projectId])
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  useEffect(() => {
+    if (projectId) {
+      fetchProject(projectId)
+      loadConversations(projectId)
+    }
+    return () => clearMessages()
+  }, [projectId])
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, isStreaming])
 
   // Auto-navigate to chapter list when brainstorm is saved
   useEffect(() => {
@@ -113,7 +119,18 @@ export default function Creator() {
                     <div className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</div>
                   ) : (
                     <div className="prose prose-sm max-w-none">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                      {msg.content ? (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                      ) : isStreaming && i === messages.length - 1 ? (
+                        <div className="flex items-center gap-1.5 py-1">
+                          <div className="w-2 h-2 bg-amber rounded-full" style={{ animation: 'dotPulse 1.4s infinite ease-in-out' }} />
+                          <div className="w-2 h-2 bg-amber rounded-full" style={{ animation: 'dotPulse 1.4s infinite ease-in-out 0.2s' }} />
+                          <div className="w-2 h-2 bg-amber rounded-full" style={{ animation: 'dotPulse 1.4s infinite ease-in-out 0.4s' }} />
+                        </div>
+                      ) : null}
+                      {isStreaming && i === messages.length - 1 && msg.content && (
+                        <span className="inline-block w-0.5 h-4 bg-amber ml-0.5 align-text-bottom animate-pulse" />
+                      )}
                     </div>
                   )}
                 </div>
@@ -135,23 +152,6 @@ export default function Creator() {
             </div>
           ))}
 
-          {/* Streaming indicator */}
-          {isStreaming && (
-            <div className="flex justify-start animate-fade-in">
-              <div className="w-8 h-8 rounded-full bg-amber/10 border border-amber/20 flex items-center justify-center mr-3 mt-1 flex-shrink-0">
-                <svg className="w-4 h-4 text-amber animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                </svg>
-              </div>
-              <div className="bg-white border border-parchment-deep/30 shadow-sm rounded-2xl rounded-bl-md p-4">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 bg-amber rounded-full" style={{ animation: 'dotPulse 1.4s infinite ease-in-out' }} />
-                  <div className="w-2 h-2 bg-amber rounded-full" style={{ animation: 'dotPulse 1.4s infinite ease-in-out 0.2s' }} />
-                  <div className="w-2 h-2 bg-amber rounded-full" style={{ animation: 'dotPulse 1.4s infinite ease-in-out 0.4s' }} />
-                </div>
-              </div>
-            </div>
-          )}
           <div ref={messagesEndRef} />
         </div>
 

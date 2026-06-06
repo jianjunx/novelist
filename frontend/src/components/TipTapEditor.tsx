@@ -1,7 +1,12 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { useEffect } from 'react'
+import { forwardRef, useEffect, useImperativeHandle } from 'react'
+
+export interface TipTapEditorHandle {
+  getSelectedText: () => string
+  replaceSelection: (text: string) => void
+}
 
 interface TipTapEditorProps {
   content: string
@@ -9,7 +14,10 @@ interface TipTapEditorProps {
   placeholder?: string
 }
 
-export default function TipTapEditor({ content, onChange, placeholder = '开始写作...' }: TipTapEditorProps) {
+const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function TipTapEditor(
+  { content, onChange, placeholder = '开始写作...' },
+  ref
+) {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -26,6 +34,19 @@ export default function TipTapEditor({ content, onChange, placeholder = '开始�
       editor.commands.setContent(content)
     }
   }, [content, editor])
+
+  useImperativeHandle(ref, () => ({
+    getSelectedText: () => {
+      if (!editor) return ''
+      const { from, to } = editor.state.selection
+      if (from === to) return ''
+      return editor.state.doc.textBetween(from, to)
+    },
+    replaceSelection: (text: string) => {
+      if (!editor) return
+      editor.chain().focus().deleteSelection().insertContent(text).run()
+    },
+  }), [editor])
 
   if (!editor) return null
 
@@ -80,4 +101,6 @@ export default function TipTapEditor({ content, onChange, placeholder = '开始�
       />
     </div>
   )
-}
+})
+
+export default TipTapEditor

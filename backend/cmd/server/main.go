@@ -17,6 +17,7 @@ func main() {
 	auth.SetSecret(cfg.JWTSecret)
 	store.InitDB(cfg.DatabaseURL)
 	ai.InitModelManager(cfg)
+	ai.InitEmbeddingManager(cfg)
 
 	r := gin.Default()
 	api.SetupRouter(r)

@@ -8,7 +8,7 @@ export function useWebSocket(onMessage?: (data: any) => void) {
   useEffect(() => {
     if (!token) return
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    ws.current = new WebSocket(`${protocol}//${window.location.host}/ws?token=${token}`)
+    ws.current = new WebSocket(`${protocol}//${window.location.host}/api/ws?token=${token}`)
     ws.current.onmessage = (e) => {
       try { onMessage?.(JSON.parse(e.data)) } catch {}
     }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jj/novelist/internal/ai"
 	"github.com/jj/novelist/internal/model"
 	"github.com/jj/novelist/internal/store"
 )
@@ -67,9 +68,13 @@ func (m *Memory) LoadShortTermMemory(ctx context.Context, currentChapterNum int)
 	return result, nil
 }
 
-// SemanticSearch searches for related characters and settings using pgvector
+// SemanticSearch searches for related characters, settings, outlines, and chapters using pgvector
 func (m *Memory) SemanticSearch(ctx context.Context, queryEmbedding []float32, limit int) (string, error) {
-	embeddingStr := formatVector(queryEmbedding)
+	if len(queryEmbedding) == 0 {
+		return "", nil
+	}
+
+	embeddingStr := store.FormatVector(queryEmbedding)
 
 	var characters []model.Character
 	store.GetDB().Where("project_id = ? AND embedding IS NOT NULL", m.ProjectID).
@@ -79,27 +84,36 @@ func (m *Memory) SemanticSearch(ctx context.Context, queryEmbedding []float32, l
 	store.GetDB().Where("project_id = ? AND embedding IS NOT NULL", m.ProjectID).
 		Order(fmt.Sprintf("embedding <-> '%s'", embeddingStr)).Limit(limit).Find(&settings)
 
-	result := "## 语义相关设定\n"
+	var outlines []model.Outline
+	store.GetDB().Where("project_id = ? AND embedding IS NOT NULL", m.ProjectID).
+		Order(fmt.Sprintf("embedding <-> '%s'", embeddingStr)).Limit(limit).Find(&outlines)
+
+	var chapters []model.Chapter
+	store.GetDB().Where("project_id = ? AND embedding IS NOT NULL", m.ProjectID).
+		Order(fmt.Sprintf("embedding <-> '%s'", embeddingStr)).Limit(limit).Find(&chapters)
+
+	if len(characters) == 0 && len(settings) == 0 && len(outlines) == 0 && len(chapters) == 0 {
+		return "", nil
+	}
+
+	result := "## 语义相关记忆\n"
 	for _, c := range characters {
-		result += fmt.Sprintf("- 人物 %s: %s\n", c.Name, c.Personality)
+		result += fmt.Sprintf("- 人物 %s（%s）: %s\n", c.Name, c.Role, c.Personality)
 	}
 	for _, s := range settings {
-		result += fmt.Sprintf("- [%s] %s\n", s.Category, s.Content)
+		result += fmt.Sprintf("- 设定 [%s] %s\n", s.Category, s.Content)
+	}
+	for _, o := range outlines {
+		result += fmt.Sprintf("- 大纲 第%d章: %s\n", o.ChapterNum, o.Summary)
+	}
+	for _, ch := range chapters {
+		content := ch.Content
+		if len([]rune(content)) > 200 {
+			content = string([]rune(content)[:200]) + "..."
+		}
+		result += fmt.Sprintf("- 章节 第%d章 %s: %s\n", ch.ChapterNum, ch.Title, content)
 	}
 	return result, nil
-}
-
-// formatVector formats a []float32 as a PostgreSQL vector literal string.
-func formatVector(v []float32) string {
-	s := "["
-	for i, f := range v {
-		if i > 0 {
-			s += ","
-		}
-		s += fmt.Sprintf("%f", f)
-	}
-	s += "]"
-	return s
 }
 
 // AssembleContext builds full context for an agent call
@@ -117,6 +131,17 @@ func (m *Memory) AssembleContext(ctx context.Context, currentChapterNum int, wor
 	fullContext := longTerm + "\n" + shortTerm
 	if workingMemory != "" {
 		fullContext += "\n## 当前任务上下文\n" + workingMemory
+
+		// Semantic search: degrade gracefully if embedding unavailable
+		if ai.EmbeddingMgr != nil {
+			embedding, err := ai.EmbeddingMgr.GenerateEmbedding(ctx, workingMemory)
+			if err == nil {
+				semantic, err := m.SemanticSearch(ctx, embedding, 5)
+				if err == nil && semantic != "" {
+					fullContext += "\n" + semantic
+				}
+			}
+		}
 	}
 	return fullContext, nil
 }

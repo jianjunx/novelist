@@ -1,12 +1,15 @@
 package api
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jj/novelist/internal/ai"
-	"github.com/jj/novelist/internal/model"
 	"github.com/jj/novelist/internal/orchestrator"
 	"github.com/jj/novelist/internal/store"
 )
@@ -32,6 +35,11 @@ func CreatorChat(c *gin.Context) {
 		}
 	}
 
+	if strings.Contains(c.GetHeader("Accept"), "text/event-stream") {
+		creatorChatStream(c, userID.(uuid.UUID), projectID, req.Messages)
+		return
+	}
+
 	resp, err := orch.CreatorChat(c.Request.Context(), userID.(uuid.UUID), projectID, req.Messages)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -39,6 +47,66 @@ func CreatorChat(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+func creatorChatStream(c *gin.Context, userID uuid.UUID, projectID uuid.UUID, messages []ai.Message) {
+	stream, err := orch.CreatorChatStream(c.Request.Context(), userID, projectID, messages)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stream.Close()
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	c.Status(http.StatusOK)
+
+	var fullResp strings.Builder
+	flusher, _ := c.Writer.(http.Flusher)
+
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			if err != io.EOF {
+				writeSSE(c, flusher, gin.H{"error": err.Error()})
+			}
+			break
+		}
+		if msg.Content == "" {
+			continue
+		}
+		fullResp.WriteString(msg.Content)
+		writeSSE(c, flusher, gin.H{"content": msg.Content})
+	}
+
+	result, err := orch.FinalizeCreatorChat(c.Request.Context(), projectID, fullResp.String())
+	if err != nil {
+		writeSSE(c, flusher, gin.H{"error": err.Error()})
+	} else {
+		writeSSE(c, flusher, gin.H{
+			"final":      true,
+			"content":    result.Content,
+			"options":    result.Options,
+			"complete":   result.Complete,
+			"data":       result.Data,
+			"saved_ids":  result.SavedIDs,
+		})
+	}
+
+	fmt.Fprintf(c.Writer, "data: [DONE]\n\n")
+	if flusher != nil {
+		flusher.Flush()
+	}
+}
+
+func writeSSE(c *gin.Context, flusher http.Flusher, data interface{}) {
+	payload, _ := json.Marshal(data)
+	fmt.Fprintf(c.Writer, "data: %s\n\n", payload)
+	if flusher != nil {
+		flusher.Flush()
+	}
 }
 
 // GenerateChapter generates chapter content
@@ -50,7 +118,7 @@ func GenerateChapter(c *gin.Context) {
 		return
 	}
 
-	store.GetDB().Model(&model.Chapter{}).Where("id = ?", chapterID).Updates(map[string]interface{}{
+	store.UpdateChapter(c.Request.Context(), uuid.MustParse(chapterID), map[string]interface{}{
 		"content":    resp,
 		"word_count": len([]rune(resp)),
 	})
@@ -98,16 +166,33 @@ func PolishContent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"content": resp})
 }
 
-// StartDiscussion starts the discussion workflow
+// StartDiscussion starts the discussion workflow with user-configured round count
 func StartDiscussion(c *gin.Context) {
-	chapterID := c.Param("id")
-	result, err := orch.StartDiscussion(c.Request.Context(), uuid.MustParse(chapterID))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	userID, _ := c.Get("user_id")
+	chapterID := uuid.MustParse(c.Param("id"))
+
+	discussionRounds := 1
+	if settings, err := store.GetSettings(c.Request.Context(), userID.(uuid.UUID)); err == nil && settings.DiscussionRounds > 0 {
+		discussionRounds = settings.DiscussionRounds
 	}
 
-	c.JSON(http.StatusOK, result)
+	multiResult := &orchestrator.MultiRoundDiscussionResult{
+		TotalRounds: discussionRounds,
+		Rounds:      make(map[int]*orchestrator.DiscussionResult),
+	}
+
+	var previous *orchestrator.DiscussionResult
+	for round := 1; round <= discussionRounds; round++ {
+		result, err := orch.StartDiscussionWithRound(c.Request.Context(), chapterID, round, previous)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		multiResult.Rounds[round] = result
+		previous = result
+	}
+
+	c.JSON(http.StatusOK, multiResult)
 }
 
 // GenerateAndReview generates content, runs one review round, and revises

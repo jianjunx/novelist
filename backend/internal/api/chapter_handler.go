@@ -86,7 +86,10 @@ func CreateChapter(c *gin.Context) {
 		oid := uuid.MustParse(*req.OutlineID)
 		chapter.OutlineID = &oid
 	}
-	store.GetDB().Create(&chapter)
+	if err := store.CreateChapter(c.Request.Context(), &chapter); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create chapter"})
+		return
+	}
 	c.JSON(http.StatusCreated, chapter)
 }
 
@@ -127,7 +130,10 @@ func UpdateChapter(c *gin.Context) {
 	if req.Status != "" {
 		updates["status"] = req.Status
 	}
-	store.GetDB().Model(&chapter).Updates(updates)
+	if err := store.UpdateChapter(c.Request.Context(), chapter.ID, updates); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update chapter"})
+		return
+	}
 	c.JSON(http.StatusOK, chapter)
 }
 

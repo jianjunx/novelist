@@ -40,7 +40,7 @@ func CreateWorldSetting(c *gin.Context) {
 		Category:  req.Category,
 		Content:   req.Content,
 	}
-	if err := store.GetDB().Create(&setting).Error; err != nil {
+	if err := store.CreateWorldSetting(c.Request.Context(), &setting); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create world setting"})
 		return
 	}
@@ -62,10 +62,13 @@ func UpdateWorldSetting(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	store.GetDB().Model(&setting).Updates(map[string]interface{}{
+	if err := store.UpdateWorldSetting(c.Request.Context(), setting.ID, map[string]interface{}{
 		"category": req.Category,
 		"content":  req.Content,
-	})
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update world setting"})
+		return
+	}
 	c.JSON(http.StatusOK, setting)
 }
 

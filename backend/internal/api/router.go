@@ -34,6 +34,7 @@ func SetupRouter(r *gin.Engine) {
 			projects.GET("/:id/outlines", GetOutlines)
 			projects.POST("/:id/outlines", CreateOutline)
 			projects.POST("/:id/expand-outlines", ExpandOutlines)
+			projects.GET("/:id/conversations", GetConversations)
 		}
 		protected.GET("/chapters/:id", GetChapter)
 		protected.PUT("/chapters/:id", UpdateChapter)

@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
 	"github.com/jj/novelist/internal/agent"
 	"github.com/jj/novelist/internal/ai"
@@ -21,6 +23,39 @@ type Orchestrator struct{}
 
 func NewOrchestrator() *Orchestrator {
 	return &Orchestrator{}
+}
+
+// buildWorkingMemory extracts keywords from chapter content and outline for semantic search
+func buildWorkingMemory(chapter *model.Chapter) string {
+	var parts []string
+	parts = append(parts, fmt.Sprintf("当前章节：第%d章 %s", chapter.ChapterNum, chapter.Title))
+
+	db := store.GetDB()
+	if db != nil {
+		if chapter.OutlineID != nil {
+			var outline model.Outline
+			if db.Where("id = ?", *chapter.OutlineID).First(&outline).Error == nil {
+				parts = append(parts, fmt.Sprintf("大纲要点：%s", outline.Summary))
+			}
+		} else {
+			var outline model.Outline
+			if db.Where("project_id = ? AND chapter_num = ?", chapter.ProjectID, chapter.ChapterNum).
+				First(&outline).Error == nil {
+				parts = append(parts, fmt.Sprintf("大纲要点：%s", outline.Summary))
+			}
+		}
+	}
+
+	if chapter.Content != "" {
+		content := chapter.Content
+		runes := []rune(content)
+		if len(runes) > 500 {
+			content = string(runes[:500])
+		}
+		parts = append(parts, fmt.Sprintf("章节内容：%s", content))
+	}
+
+	return strings.Join(parts, "\n")
 }
 
 // extractJSON attempts to extract a JSON object from a string that may contain
@@ -109,8 +144,7 @@ type OutlineData struct {
 	Summary    string `json:"summary"`
 }
 
-// CreatorChat handles multi-round conversation with Creator Agent
-func (o *Orchestrator) CreatorChat(ctx context.Context, userID uuid.UUID, projectID uuid.UUID, messages []ai.Message) (*CreatorChatResponse, error) {
+func (o *Orchestrator) prepareCreatorMessages(ctx context.Context, projectID uuid.UUID, messages []ai.Message) []ai.Message {
 	if projectID != uuid.Nil {
 		store.GetDB().Create(&model.Conversation{
 			ProjectID: projectID, Role: "user", Content: messages[len(messages)-1].Content,
@@ -129,19 +163,16 @@ func (o *Orchestrator) CreatorChat(ctx context.Context, userID uuid.UUID, projec
 	if contextStr != "" {
 		messages = append([]ai.Message{{Role: "system", Content: "当前项目上下文：\n" + contextStr}}, messages...)
 	}
+	return messages
+}
 
-	resp, err := agent.Chat(ctx, agent.RoleCreator, messages)
-	if err != nil {
-		return nil, err
-	}
-
+func (o *Orchestrator) parseCreatorResponse(ctx context.Context, projectID uuid.UUID, resp string) (*CreatorChatResponse, error) {
 	if projectID != uuid.Nil {
 		store.GetDB().Create(&model.Conversation{
 			ProjectID: projectID, Role: "assistant", Content: resp,
 		})
 	}
 
-	// Parse structured response with robust JSON extraction
 	var result CreatorChatResponse
 	if jsonStr, ok := extractJSON(resp); ok {
 		if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
@@ -151,7 +182,6 @@ func (o *Orchestrator) CreatorChat(ctx context.Context, userID uuid.UUID, projec
 		result = CreatorChatResponse{Content: resp}
 	}
 
-	// Auto-save brainstorm data when complete and projectID is valid
 	if result.Complete && result.Data != nil && projectID != uuid.Nil {
 		savedIDs, err := o.saveBrainstormData(ctx, projectID, result.Data)
 		if err == nil {
@@ -162,9 +192,31 @@ func (o *Orchestrator) CreatorChat(ctx context.Context, userID uuid.UUID, projec
 	return &result, nil
 }
 
+// CreatorChat handles multi-round conversation with Creator Agent
+func (o *Orchestrator) CreatorChat(ctx context.Context, userID uuid.UUID, projectID uuid.UUID, messages []ai.Message) (*CreatorChatResponse, error) {
+	messages = o.prepareCreatorMessages(ctx, projectID, messages)
+
+	resp, err := agent.Chat(ctx, agent.RoleCreator, messages)
+	if err != nil {
+		return nil, err
+	}
+
+	return o.parseCreatorResponse(ctx, projectID, resp)
+}
+
+// CreatorChatStream starts a streaming Creator Agent conversation
+func (o *Orchestrator) CreatorChatStream(ctx context.Context, userID uuid.UUID, projectID uuid.UUID, messages []ai.Message) (*schema.StreamReader[*schema.Message], error) {
+	messages = o.prepareCreatorMessages(ctx, projectID, messages)
+	return agent.ChatStream(ctx, agent.RoleCreator, messages)
+}
+
+// FinalizeCreatorChat parses and persists the full streamed response
+func (o *Orchestrator) FinalizeCreatorChat(ctx context.Context, projectID uuid.UUID, resp string) (*CreatorChatResponse, error) {
+	return o.parseCreatorResponse(ctx, projectID, resp)
+}
+
 // saveBrainstormData persists brainstorm results to DB and creates chapters from outlines
 func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UUID, data *BrainstormData) (*SavedIDs, error) {
-	db := store.GetDB()
 	saved := &SavedIDs{}
 
 	// Save characters
@@ -177,7 +229,7 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 			Background: c.Background,
 			Appearance: c.Appearance,
 		}
-		if err := db.Create(&char).Error; err == nil {
+		if err := store.CreateCharacter(ctx, &char); err == nil {
 			saved.CharacterIDs = append(saved.CharacterIDs, char.ID)
 		}
 	}
@@ -189,7 +241,7 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 			Category:  ws.Category,
 			Content:   ws.Content,
 		}
-		if err := db.Create(&setting).Error; err == nil {
+		if err := store.CreateWorldSetting(ctx, &setting); err == nil {
 			saved.WorldSettingIDs = append(saved.WorldSettingIDs, setting.ID)
 		}
 	}
@@ -203,7 +255,7 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 			Summary:    o.Summary,
 			Status:     "draft",
 		}
-		if err := db.Create(&outline).Error; err == nil {
+		if err := store.CreateOutline(ctx, &outline); err == nil {
 			saved.OutlineIDs = append(saved.OutlineIDs, outline.ID)
 
 			// Create a chapter for each outline entry
@@ -214,7 +266,7 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 				Title:      fmt.Sprintf("第%d章", o.ChapterNum),
 				Status:     "draft",
 			}
-			if err := db.Create(&chapter).Error; err == nil {
+			if err := store.CreateChapter(ctx, &chapter); err == nil {
 				saved.ChapterIDs = append(saved.ChapterIDs, chapter.ID)
 			}
 		}
@@ -285,7 +337,7 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 			Summary:    o.Summary,
 			Status:     "draft",
 		}
-		if err := db.Create(&outline).Error; err == nil {
+		if err := store.CreateOutline(ctx, &outline); err == nil {
 			saved.OutlineIDs = append(saved.OutlineIDs, outline.ID)
 
 			chapter := model.Chapter{
@@ -295,7 +347,7 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 				Title:      fmt.Sprintf("第%d章", o.ChapterNum),
 				Status:     "draft",
 			}
-			if err := db.Create(&chapter).Error; err == nil {
+			if err := store.CreateChapter(ctx, &chapter); err == nil {
 				saved.ChapterIDs = append(saved.ChapterIDs, chapter.ID)
 			}
 		}
@@ -313,7 +365,8 @@ func (o *Orchestrator) GenerateChapter(ctx context.Context, chapterID uuid.UUID)
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
-	contextStr, err := mem.AssembleContext(ctx, chapter.ChapterNum, "")
+	workingMemory := buildWorkingMemory(&chapter)
+	contextStr, err := mem.AssembleContext(ctx, chapter.ChapterNum, workingMemory)
 	if err != nil {
 		return "", err
 	}
@@ -333,7 +386,11 @@ func (o *Orchestrator) ContinueWriting(ctx context.Context, chapterID uuid.UUID,
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
-	contextStr, _ := mem.AssembleContext(ctx, chapter.ChapterNum, "")
+	workingMemory := buildWorkingMemory(&chapter)
+	if currentContent != "" {
+		workingMemory += "\n续写起点：" + currentContent
+	}
+	contextStr, _ := mem.AssembleContext(ctx, chapter.ChapterNum, workingMemory)
 
 	messages := []ai.Message{
 		{Role: "user", Content: fmt.Sprintf("请续写以下内容（500-1000字）：\n\n%s\n\n上下文：\n%s", currentContent, contextStr)},
@@ -361,10 +418,17 @@ type Suggestion struct {
 
 // DiscussionResult represents the aggregated discussion result
 type DiscussionResult struct {
-	EditorSuggestions []Suggestion `json:"editor_suggestions"`
-	ReaderFeedback    string       `json:"reader_feedback"`
-	CriticAnalysis    string       `json:"critic_analysis"`
-	Aggregated        []Suggestion `json:"aggregated"`
+	EditorSuggestions []Suggestion      `json:"editor_suggestions"`
+	ReaderFeedback    string            `json:"reader_feedback"`
+	CriticAnalysis    string            `json:"critic_analysis"`
+	Aggregated        []Suggestion      `json:"aggregated"`
+	Errors            map[string]string `json:"errors,omitempty"`
+}
+
+// MultiRoundDiscussionResult holds discussion results keyed by round number
+type MultiRoundDiscussionResult struct {
+	TotalRounds int                        `json:"total_rounds"`
+	Rounds      map[int]*DiscussionResult  `json:"rounds"`
 }
 
 // StartDiscussion starts the discussion workflow with all review agents
@@ -375,70 +439,13 @@ func (o *Orchestrator) StartDiscussion(ctx context.Context, chapterID uuid.UUID)
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
-	contextStr, _ := mem.AssembleContext(ctx, chapter.ChapterNum, "")
+	workingMemory := buildWorkingMemory(&chapter)
+	contextStr, _ := mem.AssembleContext(ctx, chapter.ChapterNum, workingMemory)
 
 	reviewPrompt := fmt.Sprintf("请审查以下章节：\n\n%s\n\n章节内容：\n%s", contextStr, chapter.Content)
 	messages := []ai.Message{{Role: "user", Content: reviewPrompt}}
 
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	result := &DiscussionResult{}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		resp, err := agent.Chat(ctx, agent.RoleEditor, messages)
-		if err != nil {
-			return
-		}
-		var suggestions []Suggestion
-		json.Unmarshal([]byte(resp), &suggestions)
-		mu.Lock()
-		result.EditorSuggestions = suggestions
-		mu.Unlock()
-		for _, s := range suggestions {
-			store.GetDB().Create(&model.Discussion{
-				ChapterID: chapterID, RoundNum: 1, AgentRole: "editor",
-				Content: s.Problem, SuggestionType: s.Type, Priority: s.Priority,
-			})
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		resp, err := agent.Chat(ctx, agent.RoleReader, messages)
-		if err != nil {
-			return
-		}
-		mu.Lock()
-		result.ReaderFeedback = resp
-		mu.Unlock()
-		store.GetDB().Create(&model.Discussion{
-			ChapterID: chapterID, RoundNum: 1, AgentRole: "reader", Content: resp,
-		})
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		resp, err := agent.Chat(ctx, agent.RoleCritic, messages)
-		if err != nil {
-			return
-		}
-		mu.Lock()
-		result.CriticAnalysis = resp
-		mu.Unlock()
-		store.GetDB().Create(&model.Discussion{
-			ChapterID: chapterID, RoundNum: 1, AgentRole: "critic", Content: resp,
-		})
-	}()
-
-	wg.Wait()
-
-	result.Aggregated = aggregateSuggestions(result.EditorSuggestions)
-
-	return result, nil
+	return o.runReviewAgents(ctx, chapterID, 1, messages), nil
 }
 
 // ReviewResult holds the combined result of a review round
@@ -457,7 +464,7 @@ func (o *Orchestrator) GenerateAndReview(ctx context.Context, chapterID uuid.UUI
 	}
 
 	// Save generated content
-	store.GetDB().Model(&model.Chapter{}).Where("id = ?", chapterID).Updates(map[string]interface{}{
+	store.UpdateChapter(ctx, chapterID, map[string]interface{}{
 		"content":    content,
 		"word_count": len([]rune(content)),
 	})
@@ -476,7 +483,7 @@ func (o *Orchestrator) GenerateAndReview(ctx context.Context, chapterID uuid.UUI
 	}
 
 	// Save revised content
-	store.GetDB().Model(&model.Chapter{}).Where("id = ?", chapterID).Updates(map[string]interface{}{
+	store.UpdateChapter(ctx, chapterID, map[string]interface{}{
 		"content":    revised,
 		"word_count": len([]rune(revised)),
 	})
@@ -496,7 +503,7 @@ func (o *Orchestrator) ReviewAndRevise(ctx context.Context, chapterID uuid.UUID)
 	store.GetDB().Model(&model.Discussion{}).Where("chapter_id = ?", chapterID).Select("COALESCE(MAX(round_num), 0)").Scan(&maxRound)
 
 	// Run review
-	discussion, err := o.StartDiscussionWithRound(ctx, chapterID, maxRound+1)
+	discussion, err := o.StartDiscussionWithRound(ctx, chapterID, maxRound+1, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +515,7 @@ func (o *Orchestrator) ReviewAndRevise(ctx context.Context, chapterID uuid.UUID)
 	}
 
 	// Save revised content
-	store.GetDB().Model(&model.Chapter{}).Where("id = ?", chapterID).Updates(map[string]interface{}{
+	store.UpdateChapter(ctx, chapterID, map[string]interface{}{
 		"content":    revised,
 		"word_count": len([]rune(revised)),
 	})
@@ -543,28 +550,73 @@ func (o *Orchestrator) reviseChapter(ctx context.Context, chapterID uuid.UUID, c
 	return revised, nil
 }
 
-// StartDiscussionWithRound starts discussion with a specific round number
-func (o *Orchestrator) StartDiscussionWithRound(ctx context.Context, chapterID uuid.UUID, roundNum int) (*DiscussionResult, error) {
+func formatDiscussionSummary(result *DiscussionResult) string {
+	if result == nil {
+		return ""
+	}
+	summary := "## 上一轮讨论汇总\n"
+	summary += "### 编辑建议\n"
+	for _, s := range result.EditorSuggestions {
+		summary += fmt.Sprintf("- [%s] %s：%s（建议：%s）\n", s.Type, s.Location, s.Problem, s.Suggestion)
+	}
+	summary += "\n### 读者反馈\n" + result.ReaderFeedback
+	summary += "\n### 评论家分析\n" + result.CriticAnalysis
+	return summary
+}
+
+// StartDiscussionWithRound starts discussion with a specific round number.
+// When previous is provided, its summary is included in the prompt for deeper review.
+func (o *Orchestrator) StartDiscussionWithRound(ctx context.Context, chapterID uuid.UUID, roundNum int, previous *DiscussionResult) (*DiscussionResult, error) {
 	var chapter model.Chapter
 	if err := store.GetDB().Where("id = ?", chapterID).First(&chapter).Error; err != nil {
 		return nil, fmt.Errorf("chapter not found: %w", err)
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
-	contextStr, _ := mem.AssembleContext(ctx, chapter.ChapterNum, "")
+	workingMemory := buildWorkingMemory(&chapter)
+	contextStr, _ := mem.AssembleContext(ctx, chapter.ChapterNum, workingMemory)
 
-	reviewPrompt := fmt.Sprintf("请审查以下章节：\n\n%s\n\n章节内容：\n%s", contextStr, chapter.Content)
+	var reviewPrompt string
+	if previous != nil {
+		reviewPrompt = fmt.Sprintf(
+			"请审查以下章节。\n\n以下是上一轮讨论的反馈，请在此基础上进行更深层次的审查，关注尚未解决的问题和新发现的问题：\n\n%s\n\n%s\n\n章节内容：\n%s",
+			formatDiscussionSummary(previous), contextStr, chapter.Content,
+		)
+	} else {
+		reviewPrompt = fmt.Sprintf("请审查以下章节：\n\n%s\n\n章节内容：\n%s", contextStr, chapter.Content)
+	}
 	messages := []ai.Message{{Role: "user", Content: reviewPrompt}}
 
+	return o.runReviewAgents(ctx, chapterID, roundNum, messages), nil
+}
+
+// runReviewAgents runs Editor, Reader, and Critic in parallel.
+// Individual agent failures are recorded in result.Errors and do not abort the discussion.
+func (o *Orchestrator) runReviewAgents(ctx context.Context, chapterID uuid.UUID, roundNum int, messages []ai.Message) *DiscussionResult {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	result := &DiscussionResult{}
+	result := &DiscussionResult{
+		Errors: make(map[string]string),
+	}
+
+	recordError := func(role string, err error) {
+		mu.Lock()
+		result.Errors[role] = err.Error()
+		mu.Unlock()
+		slog.Warn("discussion agent failed",
+			"agent", role,
+			"chapter_id", chapterID,
+			"round", roundNum,
+			"error", err,
+		)
+	}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		resp, err := agent.Chat(ctx, agent.RoleEditor, messages)
 		if err != nil {
+			recordError("editor", err)
 			return
 		}
 		var suggestions []Suggestion
@@ -585,6 +637,7 @@ func (o *Orchestrator) StartDiscussionWithRound(ctx context.Context, chapterID u
 		defer wg.Done()
 		resp, err := agent.Chat(ctx, agent.RoleReader, messages)
 		if err != nil {
+			recordError("reader", err)
 			return
 		}
 		mu.Lock()
@@ -600,6 +653,7 @@ func (o *Orchestrator) StartDiscussionWithRound(ctx context.Context, chapterID u
 		defer wg.Done()
 		resp, err := agent.Chat(ctx, agent.RoleCritic, messages)
 		if err != nil {
+			recordError("critic", err)
 			return
 		}
 		mu.Lock()
@@ -613,8 +667,11 @@ func (o *Orchestrator) StartDiscussionWithRound(ctx context.Context, chapterID u
 	wg.Wait()
 
 	result.Aggregated = aggregateSuggestions(result.EditorSuggestions)
+	if len(result.Errors) == 0 {
+		result.Errors = nil
+	}
 
-	return result, nil
+	return result
 }
 
 // aggregateSuggestions deduplicates and sorts suggestions by priority

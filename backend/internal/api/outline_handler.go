@@ -47,7 +47,7 @@ func CreateOutline(c *gin.Context) {
 		Summary:    req.Summary,
 		KeyEvents:  datatypes.JSON(keJSON),
 	}
-	if err := store.GetDB().Create(&outline).Error; err != nil {
+	if err := store.CreateOutline(c.Request.Context(), &outline); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create outline"})
 		return
 	}
@@ -72,12 +72,15 @@ func UpdateOutline(c *gin.Context) {
 		return
 	}
 	keJSON, _ := json.Marshal(req.KeyEvents)
-	store.GetDB().Model(&outline).Updates(map[string]interface{}{
+	if err := store.UpdateOutline(c.Request.Context(), outline.ID, map[string]interface{}{
 		"act":         req.Act,
 		"chapter_num": req.ChapterNum,
 		"summary":     req.Summary,
 		"key_events":  datatypes.JSON(keJSON),
-	})
+	}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update outline"})
+		return
+	}
 	c.JSON(http.StatusOK, outline)
 }
 

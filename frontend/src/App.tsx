@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Creator from './pages/Creator'
 import ChapterList from './pages/ChapterList'
 import ChapterEditor from './pages/ChapterEditor'
+import Settings from './pages/Settings'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuthStore()
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/projects/:projectId/creator" element={<PrivateRoute><Creator /></PrivateRoute>} />
         <Route path="/projects/:projectId/chapters" element={<PrivateRoute><ChapterList /></PrivateRoute>} />
         <Route path="/chapters/:chapterId/edit" element={<PrivateRoute><ChapterEditor /></PrivateRoute>} />
+        <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
       </Routes>
     </div>
   )
