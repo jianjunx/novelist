@@ -3,9 +3,12 @@ module github.com/jj/novelist
 go 1.25.0
 
 require (
+	github.com/cloudwego/eino v0.9.4
+	github.com/cloudwego/eino-ext/components/model/deepseek v0.1.6
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	golang.org/x/crypto v0.52.0
 	gorm.io/datatypes v1.2.7
 	gorm.io/driver/postgres v1.6.0
@@ -20,8 +23,6 @@ require (
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/cloudwego/eino v0.9.4 // indirect
-	github.com/cloudwego/eino-ext/components/model/deepseek v0.1.6 // indirect
 	github.com/cohesion-org/deepseek-go v1.3.4 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eino-contrib/jsonschema v1.0.3 // indirect
