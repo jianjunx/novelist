@@ -8,14 +8,14 @@ import (
 )
 
 type User struct {
-	ID           uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
+	ID           uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	Username     string    `gorm:"uniqueIndex;not null" json:"username"`
 	PasswordHash string    `gorm:"not null" json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
 type Project struct {
-	ID          uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
+	ID          uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	UserID      uuid.UUID `gorm:"type:uuid;index" json:"user_id"`
 	Title       string    `gorm:"not null" json:"title"`
 	Genre       string    `json:"genre"`
@@ -26,7 +26,7 @@ type Project struct {
 }
 
 type Character struct {
-	ID            uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
+	ID            uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	ProjectID     uuid.UUID `gorm:"type:uuid;index" json:"project_id"`
 	Name          string    `gorm:"not null" json:"name"`
 	Role          string    `json:"role"`
@@ -39,7 +39,7 @@ type Character struct {
 }
 
 type WorldSetting struct {
-	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
+	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	ProjectID uuid.UUID `gorm:"type:uuid;index" json:"project_id"`
 	Category  string    `gorm:"not null" json:"category"`
 	Content   string    `gorm:"not null" json:"content"`
@@ -48,7 +48,7 @@ type WorldSetting struct {
 }
 
 type Outline struct {
-	ID         uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
+	ID         uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	ProjectID  uuid.UUID `gorm:"type:uuid;index" json:"project_id"`
 	Act        int       `json:"act"`
 	ChapterNum int       `json:"chapter_num"`
@@ -60,7 +60,7 @@ type Outline struct {
 }
 
 type Chapter struct {
-	ID         uuid.UUID  `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
+	ID         uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	ProjectID  uuid.UUID  `gorm:"type:uuid;index" json:"project_id"`
 	OutlineID  *uuid.UUID `gorm:"type:uuid" json:"outline_id"`
 	ChapterNum int        `gorm:"not null" json:"chapter_num"`
@@ -74,7 +74,7 @@ type Chapter struct {
 }
 
 type Discussion struct {
-	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
+	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	ChapterID      uuid.UUID `gorm:"type:uuid;index" json:"chapter_id"`
 	RoundNum       int       `gorm:"not null" json:"round_num"`
 	AgentRole      string    `gorm:"not null" json:"agent_role"`
@@ -85,7 +85,7 @@ type Discussion struct {
 }
 
 type Conversation struct {
-	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
+	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	ProjectID uuid.UUID `gorm:"type:uuid;index" json:"project_id"`
 	Role      string    `gorm:"not null" json:"role"`
 	Content   string    `gorm:"not null" json:"content"`
@@ -93,7 +93,7 @@ type Conversation struct {
 }
 
 type Setting struct {
-	ID               uuid.UUID `gorm:"type:uuid;primary_key;default:uuid_generate_v4()" json:"id"`
+	ID               uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	UserID           uuid.UUID `gorm:"type:uuid;uniqueIndex" json:"user_id"`
 	DefaultModel     string    `gorm:"default:deepseek-chat" json:"default_model"`
 	DeepSeekKey      string    `json:"deepseek_key"`

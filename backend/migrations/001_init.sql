@@ -1,9 +1,8 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- 用户表
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now()
@@ -11,7 +10,7 @@ CREATE TABLE users (
 
 -- 小说项目
 CREATE TABLE projects (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     genre TEXT,
@@ -23,7 +22,7 @@ CREATE TABLE projects (
 
 -- 人物档案
 CREATE TABLE characters (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     role TEXT,
@@ -37,7 +36,7 @@ CREATE TABLE characters (
 
 -- 世界观设定
 CREATE TABLE world_settings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     category TEXT NOT NULL,
     content TEXT NOT NULL,
@@ -47,7 +46,7 @@ CREATE TABLE world_settings (
 
 -- 故事大纲
 CREATE TABLE outlines (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     act INT,
     chapter_num INT,
@@ -60,7 +59,7 @@ CREATE TABLE outlines (
 
 -- 章节
 CREATE TABLE chapters (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     outline_id UUID REFERENCES outlines(id),
     chapter_num INT NOT NULL,
@@ -75,7 +74,7 @@ CREATE TABLE chapters (
 
 -- 讨论记录
 CREATE TABLE discussions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     chapter_id UUID REFERENCES chapters(id) ON DELETE CASCADE,
     round_num INT NOT NULL,
     agent_role TEXT NOT NULL,
@@ -87,7 +86,7 @@ CREATE TABLE discussions (
 
 -- 对话记录（构思Agent多轮对话）
 CREATE TABLE conversations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     role TEXT NOT NULL,
     content TEXT NOT NULL,
@@ -96,7 +95,7 @@ CREATE TABLE conversations (
 
 -- 用户设置
 CREATE TABLE settings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     default_model TEXT DEFAULT 'deepseek-chat',
     deepseek_key TEXT,
