@@ -18,7 +18,17 @@ func SetupRouter(r *gin.Engine) {
 	protected := api.Group("")
 	protected.Use(auth.AuthMiddleware())
 	{
-		// Routes will be added in subsequent tasks
-		_ = protected
+		projects := protected.Group("/projects")
+		{
+			projects.GET("", GetProjects)
+			projects.POST("", CreateProject)
+			projects.GET("/:id", GetProject)
+			projects.PUT("/:id", UpdateProject)
+			projects.DELETE("/:id", DeleteProject)
+			projects.GET("/:id/chapters", GetChapters)
+			projects.POST("/:id/chapters", CreateChapter)
+		}
+		protected.GET("/chapters/:id", GetChapter)
+		protected.PUT("/chapters/:id", UpdateChapter)
 	}
 }
