@@ -1,14 +1,23 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useAuthStore } from './stores/authStore'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
 
-function App() {
+function PrivateRoute({ children }: { children: React.ReactNode }) {
+  const { token } = useAuthStore()
+  return token ? <>{children}</> : <Navigate to="/login" />
+}
+
+export default function App() {
+  const { checkAuth } = useAuthStore()
+  useEffect(() => { checkAuth() }, [])
   return (
     <div className="min-h-screen bg-gray-50">
       <Routes>
-        <Route path="/" element={<div>Home</div>} />
-        <Route path="/login" element={<div>Login</div>} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       </Routes>
     </div>
   )
 }
-
-export default App
