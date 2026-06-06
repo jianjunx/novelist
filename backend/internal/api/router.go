@@ -27,8 +27,19 @@ func SetupRouter(r *gin.Engine) {
 			projects.DELETE("/:id", DeleteProject)
 			projects.GET("/:id/chapters", GetChapters)
 			projects.POST("/:id/chapters", CreateChapter)
+			projects.GET("/:id/characters", GetCharacters)
+			projects.POST("/:id/characters", CreateCharacter)
+			projects.GET("/:id/world-settings", GetWorldSettings)
+			projects.POST("/:id/world-settings", CreateWorldSetting)
+			projects.GET("/:id/outlines", GetOutlines)
+			projects.POST("/:id/outlines", CreateOutline)
 		}
 		protected.GET("/chapters/:id", GetChapter)
 		protected.PUT("/chapters/:id", UpdateChapter)
+		protected.PUT("/characters/:id", UpdateCharacter)
+		protected.PUT("/world-settings/:id", UpdateWorldSetting)
+		protected.PUT("/outlines/:id", UpdateOutline)
+		protected.GET("/settings", GetSettings)
+		protected.PUT("/settings", UpdateSettings)
 	}
 }
