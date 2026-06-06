@@ -3,6 +3,8 @@ package config
 import (
     "log"
     "os"
+
+    "github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -14,6 +16,9 @@ type Config struct {
 }
 
 func Load() *Config {
+    // 加载.env文件（如果存在）
+    _ = godotenv.Load()
+
     jwtSecret := os.Getenv("JWT_SECRET")
     if jwtSecret == "" {
         log.Fatal("JWT_SECRET environment variable is required")
