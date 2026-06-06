@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/jj/novelist/internal/model"
 	"github.com/jj/novelist/internal/store"
 	"gorm.io/datatypes"
@@ -22,20 +21,20 @@ type CreateCharacterRequest struct {
 
 func GetCharacters(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var project model.Project
-	if err := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).First(&project).Error; err != nil {
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
 	var characters []model.Character
-	store.GetDB().Where("project_id = ?", c.Param("id")).Find(&characters)
+	store.GetDB().Where("project_id = ?", project.ID).Find(&characters)
 	c.JSON(http.StatusOK, characters)
 }
 
 func CreateCharacter(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var project model.Project
-	if err := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).First(&project).Error; err != nil {
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
@@ -46,7 +45,7 @@ func CreateCharacter(c *gin.Context) {
 	}
 	relJSON, _ := json.Marshal(req.Relationships)
 	character := model.Character{
-		ProjectID:     uuid.MustParse(c.Param("id")),
+		ProjectID:     project.ID,
 		Name:          req.Name,
 		Role:          req.Role,
 		Personality:   req.Personality,

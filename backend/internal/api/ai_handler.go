@@ -27,7 +27,9 @@ func CreatorChat(c *gin.Context) {
 
 	var projectID uuid.UUID
 	if req.ProjectID != "" {
-		projectID = uuid.MustParse(req.ProjectID)
+		if project, err := findProjectByParam(req.ProjectID, userID); err == nil {
+			projectID = project.ID
+		}
 	}
 
 	resp, err := orch.CreatorChat(c.Request.Context(), userID.(uuid.UUID), projectID, req.Messages)
@@ -105,5 +107,27 @@ func StartDiscussion(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusOK, result)
+}
+
+// GenerateAndReview generates content, runs one review round, and revises
+func GenerateAndReview(c *gin.Context) {
+	chapterID := c.Param("id")
+	result, err := orch.GenerateAndReview(c.Request.Context(), uuid.MustParse(chapterID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// ReviewAndRevise runs a new review round on existing content and revises
+func ReviewAndRevise(c *gin.Context) {
+	chapterID := c.Param("id")
+	result, err := orch.ReviewAndRevise(c.Request.Context(), uuid.MustParse(chapterID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, result)
 }

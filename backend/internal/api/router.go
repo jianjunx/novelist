@@ -48,6 +48,8 @@ func SetupRouter(r *gin.Engine) {
 
 		protected.POST("/creator/chat", CreatorChat)
 		protected.POST("/chapters/:id/generate", GenerateChapter)
+		protected.POST("/chapters/:id/generate-review", GenerateAndReview)
+		protected.POST("/chapters/:id/review-revise", ReviewAndRevise)
 		protected.POST("/chapters/:id/continue", ContinueWriting)
 		protected.POST("/chapters/:id/polish", PolishContent)
 		protected.POST("/chapters/:id/discuss", StartDiscussion)

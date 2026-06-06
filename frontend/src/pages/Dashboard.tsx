@@ -18,7 +18,7 @@ export default function Dashboard() {
     const project = await createProject({ title: newTitle })
     setShowCreate(false)
     setNewTitle('')
-    navigate(`/projects/${project.id}/creator`)
+    navigate(`/projects/${project.short_id || project.id}/creator`)
   }
 
   return (

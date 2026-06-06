@@ -11,11 +11,12 @@ import (
 type AgentRole string
 
 const (
-	RoleCreator AgentRole = "creator"
-	RoleWriter  AgentRole = "writer"
-	RoleEditor  AgentRole = "editor"
-	RoleReader  AgentRole = "reader"
-	RoleCritic  AgentRole = "critic"
+	RoleCreator  AgentRole = "creator"
+	RoleWriter   AgentRole = "writer"
+	RoleEditor   AgentRole = "editor"
+	RoleReader   AgentRole = "reader"
+	RoleCritic   AgentRole = "critic"
+	RoleReviser  AgentRole = "reviser"
 )
 
 func GetPrompt(role AgentRole) string {
@@ -30,6 +31,8 @@ func GetPrompt(role AgentRole) string {
 		return ReaderPrompt
 	case RoleCritic:
 		return CriticPrompt
+	case RoleReviser:
+		return ReviserPrompt
 	default:
 		return ""
 	}

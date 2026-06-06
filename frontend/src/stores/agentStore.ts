@@ -7,6 +7,13 @@ interface BrainstormData {
   outlines?: Array<{ act: number; chapter_num: number; summary: string }>
 }
 
+interface SavedIDs {
+  character_ids?: string[]
+  world_setting_ids?: string[]
+  outline_ids?: string[]
+  chapter_ids?: string[]
+}
+
 interface Message {
   role: 'user' | 'agent'
   content: string
@@ -14,6 +21,7 @@ interface Message {
   options?: string[]
   complete?: boolean
   data?: BrainstormData
+  saved_ids?: SavedIDs
 }
 
 interface AgentState {
@@ -21,6 +29,7 @@ interface AgentState {
   isStreaming: boolean
   streamContent: string
   brainstormData: BrainstormData | null
+  savedIDs: SavedIDs | null
   sendMessage: (projectId: string, content: string) => Promise<void>
   clearMessages: () => void
   setBrainstormData: (data: BrainstormData | null) => void
@@ -31,6 +40,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   isStreaming: false,
   streamContent: '',
   brainstormData: null,
+  savedIDs: null,
   sendMessage: async (projectId, content) => {
     const userMessage: Message = { role: 'user', content }
     const allMessages = [...get().messages, userMessage]
@@ -48,13 +58,17 @@ export const useAgentStore = create<AgentState>((set, get) => ({
         options: data.options,
         complete: data.complete,
         data: data.data,
+        saved_ids: data.saved_ids,
       }
       set({ messages: [...allMessages, agentMessage], isStreaming: false })
       if (data.data) {
         set({ brainstormData: data.data })
       }
+      if (data.saved_ids) {
+        set({ savedIDs: data.saved_ids })
+      }
     } catch { set({ isStreaming: false }) }
   },
-  clearMessages: () => set({ messages: [], brainstormData: null }),
+  clearMessages: () => set({ messages: [], brainstormData: null, savedIDs: null }),
   setBrainstormData: (data) => set({ brainstormData: data }),
 }))

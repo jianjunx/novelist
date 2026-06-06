@@ -17,22 +17,56 @@ type CreateChapterRequest struct {
 	Content    string  `json:"content"`
 }
 
+// ChapterWithOutline extends Chapter with outline summary and generation availability
+type ChapterWithOutline struct {
+	model.Chapter
+	OutlineSummary string `json:"outline_summary"`
+	CanGenerate    bool   `json:"can_generate"`
+}
+
 func GetChapters(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var project model.Project
-	if err := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).First(&project).Error; err != nil {
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
 	var chapters []model.Chapter
-	store.GetDB().Where("project_id = ?", c.Param("id")).Order("chapter_num").Find(&chapters)
-	c.JSON(http.StatusOK, chapters)
+	store.GetDB().Where("project_id = ?", project.ID).Order("chapter_num").Find(&chapters)
+
+	// Load outlines for this project
+	var outlines []model.Outline
+	store.GetDB().Where("project_id = ?", c.Param("id")).Find(&outlines)
+	outlineMap := make(map[uuid.UUID]string)
+	for _, o := range outlines {
+		outlineMap[o.ID] = o.Summary
+	}
+
+	// Build response with outline_summary and can_generate
+	var results []ChapterWithOutline
+	for i, ch := range chapters {
+		cwo := ChapterWithOutline{
+			Chapter:     ch,
+			CanGenerate: false,
+		}
+		if ch.OutlineID != nil {
+			cwo.OutlineSummary = outlineMap[*ch.OutlineID]
+		}
+		// First chapter can always generate; others need previous chapter to have content
+		if i == 0 {
+			cwo.CanGenerate = ch.Content == ""
+		} else if ch.Content == "" && chapters[i-1].Content != "" {
+			cwo.CanGenerate = true
+		}
+		results = append(results, cwo)
+	}
+	c.JSON(http.StatusOK, results)
 }
 
 func CreateChapter(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var project model.Project
-	if err := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).First(&project).Error; err != nil {
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
@@ -42,7 +76,7 @@ func CreateChapter(c *gin.Context) {
 		return
 	}
 	chapter := model.Chapter{
-		ProjectID:  uuid.MustParse(c.Param("id")),
+		ProjectID:  project.ID,
 		ChapterNum: req.ChapterNum,
 		Title:      req.Title,
 		Content:    req.Content,

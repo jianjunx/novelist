@@ -4,27 +4,26 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/jj/novelist/internal/model"
 	"github.com/jj/novelist/internal/store"
 )
 
 func GetWorldSettings(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var project model.Project
-	if err := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).First(&project).Error; err != nil {
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
 	var settings []model.WorldSetting
-	store.GetDB().Where("project_id = ?", c.Param("id")).Find(&settings)
+	store.GetDB().Where("project_id = ?", project.ID).Find(&settings)
 	c.JSON(http.StatusOK, settings)
 }
 
 func CreateWorldSetting(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var project model.Project
-	if err := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).First(&project).Error; err != nil {
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
@@ -37,7 +36,7 @@ func CreateWorldSetting(c *gin.Context) {
 		return
 	}
 	setting := model.WorldSetting{
-		ProjectID: uuid.MustParse(c.Param("id")),
+		ProjectID: project.ID,
 		Category:  req.Category,
 		Content:   req.Content,
 	}

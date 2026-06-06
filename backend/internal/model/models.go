@@ -1,11 +1,20 @@
 package model
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 )
+
+// GenerateShortID creates an 8-character random hex string
+func GenerateShortID() string {
+	b := make([]byte, 4)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
 
 type User struct {
 	ID           uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
@@ -16,6 +25,7 @@ type User struct {
 
 type Project struct {
 	ID          uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	ShortID     string    `gorm:"uniqueIndex;not null" json:"short_id"`
 	UserID      uuid.UUID `gorm:"type:uuid;index" json:"user_id"`
 	Title       string    `gorm:"not null" json:"title"`
 	Genre       string    `json:"genre"`

@@ -4,19 +4,27 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAgentStore } from '../stores/agentStore'
 import { useProjectStore } from '../stores/projectStore'
-import api from '../api/client'
 
 export default function Creator() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
-  const { messages, isStreaming, sendMessage, clearMessages, brainstormData } = useAgentStore()
+  const { messages, isStreaming, sendMessage, clearMessages, savedIDs } = useAgentStore()
   const { currentProject, fetchProject } = useProjectStore()
   const [input, setInput] = useState('')
-  const [saving, setSaving] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { if (projectId) fetchProject(projectId); return () => clearMessages() }, [projectId])
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
+  // Auto-navigate to chapter list when brainstorm is saved
+  useEffect(() => {
+    if (savedIDs?.chapter_ids && savedIDs.chapter_ids.length > 0) {
+      const timer = setTimeout(() => {
+        navigate(`/projects/${projectId}/chapters`)
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [savedIDs, navigate, projectId])
 
   const handleSend = async () => {
     if (!input.trim() || !projectId) return
@@ -28,33 +36,6 @@ export default function Creator() {
   const handleOptionClick = async (option: string) => {
     if (!projectId) return
     await sendMessage(projectId, option)
-  }
-
-  const handleSaveBrainstorm = async () => {
-    if (!projectId || !brainstormData) return
-    setSaving(true)
-    try {
-      if (brainstormData.characters) {
-        for (const char of brainstormData.characters) {
-          await api.post(`/projects/${projectId}/characters`, char)
-        }
-      }
-      if (brainstormData.worldSettings) {
-        for (const ws of brainstormData.worldSettings) {
-          await api.post(`/projects/${projectId}/world-settings`, ws)
-        }
-      }
-      if (brainstormData.outlines) {
-        for (const outline of brainstormData.outlines) {
-          await api.post(`/projects/${projectId}/outlines`, outline)
-        }
-      }
-      navigate('/')
-    } catch (err) {
-      console.error('Failed to save brainstorm data:', err)
-    } finally {
-      setSaving(false)
-    }
   }
 
   return (
@@ -77,26 +58,13 @@ export default function Creator() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {brainstormData && (
-              <button
-                onClick={handleSaveBrainstorm}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-sage text-white rounded-lg hover:bg-sage/90 transition-colors disabled:opacity-50 shadow-md shadow-sage/20"
-              >
-                {saving ? (
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" />
-                    <polyline points="7 3 7 8 15 8" />
-                  </svg>
-                )}
-                <span className="text-sm font-medium">{saving ? '保存中...' : '完成构思'}</span>
-              </button>
+            {savedIDs?.chapter_ids && savedIDs.chapter_ids.length > 0 && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-sage/10 text-sage border border-sage/20 rounded-lg animate-fade-in">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                <span className="text-sm font-medium">构思已保存，正在跳转...</span>
+              </div>
             )}
           </div>
         </div>

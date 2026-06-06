@@ -11,6 +11,7 @@ CREATE TABLE users (
 -- 小说项目
 CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    short_id TEXT UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(4), 'hex'),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     genre TEXT,

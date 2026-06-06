@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -16,14 +17,48 @@ type CreateProjectRequest struct {
 	StyleGuide  string `json:"style_guide"`
 }
 
+// ProjectWithStatus extends Project with computed status fields
+type ProjectWithStatus struct {
+	model.Project
+	Brainstormed   bool       `json:"brainstormed"`
+	HasChapters    bool       `json:"has_chapters"`
+	HasContent     bool       `json:"has_content"`
+	FirstChapterID *uuid.UUID `json:"first_chapter_id"`
+}
+
+// findProjectByParam looks up a project by short_id, falling back to UUID
+func findProjectByParam(id string, userID interface{}) (*model.Project, error) {
+	var project model.Project
+	db := store.GetDB()
+	// Try short_id first
+	if err := db.Where("short_id = ? AND user_id = ?", id, userID).First(&project).Error; err == nil {
+		return &project, nil
+	}
+	// Fallback to UUID
+	if err := db.Where("id = ? AND user_id = ?", id, userID).First(&project).Error; err == nil {
+		return &project, nil
+	}
+	return nil, fmt.Errorf("project not found")
+}
+
+const projectStatusSQL = `
+	SELECT p.*,
+		EXISTS(SELECT 1 FROM outlines WHERE project_id = p.id) AS brainstormed,
+		EXISTS(SELECT 1 FROM chapters WHERE project_id = p.id) AS has_chapters,
+		EXISTS(SELECT 1 FROM chapters WHERE project_id = p.id AND content != '') AS has_content,
+		(SELECT id FROM chapters WHERE project_id = p.id ORDER BY chapter_num ASC LIMIT 1) AS first_chapter_id
+	FROM projects p
+`
+
 func GetProjects(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var projects []model.Project
-	if err := store.GetDB().Where("user_id = ?", userID).Order("created_at DESC").Find(&projects).Error; err != nil {
+	var results []ProjectWithStatus
+	err := store.GetDB().Raw(projectStatusSQL+"WHERE p.user_id = ? ORDER BY p.created_at DESC", userID).Scan(&results).Error
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch projects"})
 		return
 	}
-	c.JSON(http.StatusOK, projects)
+	c.JSON(http.StatusOK, results)
 }
 
 func CreateProject(c *gin.Context) {
@@ -34,6 +69,7 @@ func CreateProject(c *gin.Context) {
 		return
 	}
 	project := model.Project{
+		ShortID:     model.GenerateShortID(),
 		UserID:      userID.(uuid.UUID),
 		Title:       req.Title,
 		Genre:       req.Genre,
@@ -49,18 +85,24 @@ func CreateProject(c *gin.Context) {
 
 func GetProject(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var project model.Project
-	if err := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).First(&project).Error; err != nil {
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
-	c.JSON(http.StatusOK, project)
+	var result ProjectWithStatus
+	err = store.GetDB().Raw(projectStatusSQL+"WHERE p.id = ? AND p.user_id = ?", project.ID, userID).Scan(&result).Error
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+	c.JSON(http.StatusOK, result)
 }
 
 func UpdateProject(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var project model.Project
-	if err := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).First(&project).Error; err != nil {
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
@@ -78,7 +120,12 @@ func UpdateProject(c *gin.Context) {
 
 func DeleteProject(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	result := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).Delete(&model.Project{})
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+	result := store.GetDB().Delete(project)
 	if result.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return

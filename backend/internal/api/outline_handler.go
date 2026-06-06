@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/jj/novelist/internal/model"
 	"github.com/jj/novelist/internal/store"
 	"gorm.io/datatypes"
@@ -13,20 +12,20 @@ import (
 
 func GetOutlines(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var project model.Project
-	if err := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).First(&project).Error; err != nil {
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
 	var outlines []model.Outline
-	store.GetDB().Where("project_id = ?", c.Param("id")).Order("act, chapter_num").Find(&outlines)
+	store.GetDB().Where("project_id = ?", project.ID).Order("act, chapter_num").Find(&outlines)
 	c.JSON(http.StatusOK, outlines)
 }
 
 func CreateOutline(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	var project model.Project
-	if err := store.GetDB().Where("id = ? AND user_id = ?", c.Param("id"), userID).First(&project).Error; err != nil {
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
@@ -42,7 +41,7 @@ func CreateOutline(c *gin.Context) {
 	}
 	keJSON, _ := json.Marshal(req.KeyEvents)
 	outline := model.Outline{
-		ProjectID:  uuid.MustParse(c.Param("id")),
+		ProjectID:  project.ID,
 		Act:        req.Act,
 		ChapterNum: req.ChapterNum,
 		Summary:    req.Summary,
