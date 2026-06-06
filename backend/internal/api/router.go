@@ -36,9 +36,13 @@ func SetupRouter(r *gin.Engine) {
 		}
 		protected.GET("/chapters/:id", GetChapter)
 		protected.PUT("/chapters/:id", UpdateChapter)
+		protected.DELETE("/chapters/:id", DeleteChapter)
 		protected.PUT("/characters/:id", UpdateCharacter)
+		protected.DELETE("/characters/:id", DeleteCharacter)
 		protected.PUT("/world-settings/:id", UpdateWorldSetting)
+		protected.DELETE("/world-settings/:id", DeleteWorldSetting)
 		protected.PUT("/outlines/:id", UpdateOutline)
+		protected.DELETE("/outlines/:id", DeleteOutline)
 		protected.GET("/settings", GetSettings)
 		protected.PUT("/settings", UpdateSettings)
 

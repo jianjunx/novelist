@@ -81,3 +81,14 @@ func UpdateOutline(c *gin.Context) {
 	})
 	c.JSON(http.StatusOK, outline)
 }
+
+func DeleteOutline(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	var outline model.Outline
+	if err := store.GetDB().Joins("Project").Where("outlines.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&outline).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Outline not found"})
+		return
+	}
+	store.GetDB().Delete(&outline)
+	c.JSON(http.StatusOK, gin.H{"message": "Outline deleted"})
+}

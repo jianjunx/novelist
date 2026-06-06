@@ -84,3 +84,14 @@ func UpdateCharacter(c *gin.Context) {
 	})
 	c.JSON(http.StatusOK, character)
 }
+
+func DeleteCharacter(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	var character model.Character
+	if err := store.GetDB().Joins("Project").Where("characters.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&character).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Character not found"})
+		return
+	}
+	store.GetDB().Delete(&character)
+	c.JSON(http.StatusOK, gin.H{"message": "Character deleted"})
+}

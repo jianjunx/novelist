@@ -69,3 +69,14 @@ func UpdateWorldSetting(c *gin.Context) {
 	})
 	c.JSON(http.StatusOK, setting)
 }
+
+func DeleteWorldSetting(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	var setting model.WorldSetting
+	if err := store.GetDB().Joins("Project").Where("world_settings.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&setting).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "World setting not found"})
+		return
+	}
+	store.GetDB().Delete(&setting)
+	c.JSON(http.StatusOK, gin.H{"message": "World setting deleted"})
+}

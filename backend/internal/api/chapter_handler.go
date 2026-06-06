@@ -96,3 +96,14 @@ func UpdateChapter(c *gin.Context) {
 	store.GetDB().Model(&chapter).Updates(updates)
 	c.JSON(http.StatusOK, chapter)
 }
+
+func DeleteChapter(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	var chapter model.Chapter
+	if err := store.GetDB().Joins("Project").Where("chapters.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&chapter).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Chapter not found"})
+		return
+	}
+	store.GetDB().Delete(&chapter)
+	c.JSON(http.StatusOK, gin.H{"message": "Chapter deleted"})
+}
