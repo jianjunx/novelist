@@ -21,8 +21,42 @@ func NewOrchestrator() *Orchestrator {
 	return &Orchestrator{}
 }
 
+// CreatorChatResponse represents the structured response from Creator agent
+type CreatorChatResponse struct {
+	Content  string   `json:"content"`
+	Options  []string `json:"options,omitempty"`
+	Complete bool     `json:"complete,omitempty"`
+	Data     *BrainstormData `json:"data,omitempty"`
+}
+
+// BrainstormData represents the structured brainstorming results
+type BrainstormData struct {
+	Characters    []CharacterData    `json:"characters,omitempty"`
+	WorldSettings []WorldSettingData `json:"worldSettings,omitempty"`
+	Outlines      []OutlineData      `json:"outlines,omitempty"`
+}
+
+type CharacterData struct {
+	Name        string `json:"name"`
+	Role        string `json:"role"`
+	Personality string `json:"personality"`
+	Background  string `json:"background"`
+	Appearance  string `json:"appearance"`
+}
+
+type WorldSettingData struct {
+	Category string `json:"category"`
+	Content  string `json:"content"`
+}
+
+type OutlineData struct {
+	Act        int    `json:"act"`
+	ChapterNum int    `json:"chapter_num"`
+	Summary    string `json:"summary"`
+}
+
 // CreatorChat handles multi-round conversation with Creator Agent
-func (o *Orchestrator) CreatorChat(ctx context.Context, userID uuid.UUID, projectID uuid.UUID, messages []ai.Message) (string, error) {
+func (o *Orchestrator) CreatorChat(ctx context.Context, userID uuid.UUID, projectID uuid.UUID, messages []ai.Message) (*CreatorChatResponse, error) {
 	if projectID != uuid.Nil {
 		store.GetDB().Create(&model.Conversation{
 			ProjectID: projectID, Role: "user", Content: messages[len(messages)-1].Content,
@@ -44,7 +78,7 @@ func (o *Orchestrator) CreatorChat(ctx context.Context, userID uuid.UUID, projec
 
 	resp, err := agent.Chat(ctx, agent.RoleCreator, messages)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if projectID != uuid.Nil {
@@ -53,7 +87,14 @@ func (o *Orchestrator) CreatorChat(ctx context.Context, userID uuid.UUID, projec
 		})
 	}
 
-	return resp, nil
+	// Parse structured response
+	var result CreatorChatResponse
+	if err := json.Unmarshal([]byte(resp), &result); err != nil {
+		// If parsing fails, return as plain text
+		result = CreatorChatResponse{Content: resp}
+	}
+
+	return &result, nil
 }
 
 // GenerateChapter generates chapter content using Writer Agent

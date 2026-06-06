@@ -36,7 +36,7 @@ func CreatorChat(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"content": resp})
+	c.JSON(http.StatusOK, resp)
 }
 
 // GenerateChapter generates chapter content
