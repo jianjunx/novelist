@@ -77,8 +77,8 @@ export default function Creator() {
       </header>
 
       {/* Messages area */}
-      <div className="flex-1 max-w-4xl mx-auto w-full px-6 py-6 flex flex-col">
-        <div className="flex-1 overflow-y-auto mb-6 space-y-6">
+      <div className="flex-1 max-w-4xl mx-auto w-full px-6 py-6 flex flex-col pb-32">
+        <div className="flex-1 overflow-y-auto space-y-6">
           {/* Empty state */}
           {messages.length === 0 && (
             <div className="text-center py-16 animate-fade-in">
@@ -155,29 +155,34 @@ export default function Creator() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area */}
-        <div className="bg-white rounded-xl border border-parchment-deep/30 shadow-lg shadow-ink/5 p-4">
-          <div className="flex gap-3">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-              placeholder="输入你的想法..."
-              className="flex-1 px-4 py-3 bg-parchment-dark border border-parchment-deep rounded-lg text-ink placeholder-warm-gray resize-none transition-all duration-200"
-              rows={2}
-            />
-            <button
-              onClick={handleSend}
-              disabled={isStreaming || !input.trim()}
-              className="px-5 py-3 bg-ink text-parchment rounded-lg hover:bg-ink-light transition-all duration-300 disabled:opacity-30 self-end group"
-            >
-              <svg className="w-5 h-5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
-            </button>
+      </div>
+
+      {/* Floating input area */}
+      <div className="fixed bottom-0 left-0 right-0 z-30">
+        <div className="max-w-4xl mx-auto px-6 pb-4">
+          <div className="bg-white/90 backdrop-blur-md rounded-xl border border-parchment-deep/30 shadow-xl shadow-ink/10 p-4">
+            <div className="flex gap-3">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+                placeholder="输入你的想法..."
+                className="flex-1 px-4 py-3 bg-parchment-dark border border-parchment-deep rounded-lg text-ink placeholder-warm-gray resize-none transition-all duration-200"
+                rows={2}
+              />
+              <button
+                onClick={handleSend}
+                disabled={isStreaming || !input.trim()}
+                className="px-5 py-3 bg-ink text-parchment rounded-lg hover:bg-ink-light transition-all duration-300 disabled:opacity-30 self-end group"
+              >
+                <svg className="w-5 h-5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-xs text-warm-gray mt-2 font-literary">按 Enter 发送，Shift+Enter 换行</p>
           </div>
-          <p className="text-xs text-warm-gray mt-2 font-literary">按 Enter 发送，Shift+Enter 换行</p>
         </div>
       </div>
     </div>
