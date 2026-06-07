@@ -27,21 +27,11 @@ func InitEmbeddingManager(cfg *config.Config) {
 	baseURL := cfg.EmbeddingBaseURL
 
 	if apiKey == "" {
-		apiKey = cfg.OpenAIKey
-		if baseURL == "" {
-			baseURL = "https://api.openai.com/v1"
-		}
-	}
-	if apiKey == "" {
-		apiKey = cfg.DeepSeekKey
-		if baseURL == "" {
-			baseURL = "https://api.deepseek.com/v1"
-		}
-	}
-
-	if apiKey == "" {
-		log.Println("Embedding manager not initialized: no API key")
+		log.Println("Embedding manager not initialized: EMBEDDING_API_KEY not set")
 		return
+	}
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
 	}
 
 	EmbeddingMgr = &EmbeddingManager{
