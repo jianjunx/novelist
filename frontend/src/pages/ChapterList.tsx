@@ -340,36 +340,23 @@ export default function ChapterList() {
           {/* Right: Chapter detail */}
           <main className="flex-1 overflow-y-auto">
             {selected ? (
-              <div className="max-w-3xl mx-auto px-8 py-8">
-                {/* Chapter header */}
-                <div className="mb-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber/10 text-amber font-serif font-bold text-lg">
+              <div className="max-w-4xl mx-auto px-8 py-8">
+                {/* Chapter header + action buttons */}
+                <div className="flex items-start justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-amber/10 text-amber font-serif font-bold text-lg shrink-0">
                       {selected.chapter_num}
                     </span>
-                    <div>
-                      <h2 className="text-2xl font-serif font-bold text-ink">{selected.title}</h2>
+                    <div className="min-w-0">
+                      <h2 className="text-2xl font-serif font-bold text-ink truncate">{selected.title}</h2>
                       {selectedHasContent && (
                         <span className="text-sm text-warm-gray">{selected.word_count} 字</span>
                       )}
                     </div>
                   </div>
 
-                  {selected.outline_summary && (
-                    <div className="bg-amber/5 border border-amber/10 rounded-xl p-4 mt-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <svg className="w-4 h-4 text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M9 18l6-6-6-6" />
-                        </svg>
-                        <span className="text-sm font-medium text-amber-dark">大纲摘要</span>
-                      </div>
-                      <p className="text-sm text-ink-muted font-literary leading-relaxed">{selected.outline_summary}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex items-center gap-3 mb-6">
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-2 shrink-0">
                   {selectedHasContent ? (
                     <>
                       <button
@@ -446,7 +433,21 @@ export default function ChapterList() {
                       <span className="text-sm">请先完成前置章节</span>
                     </div>
                   )}
+                  </div>
                 </div>
+
+                {/* Outline summary */}
+                {selected.outline_summary && (
+                  <div className="bg-amber/5 border border-amber/10 rounded-xl p-4 mb-6">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-amber" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                      <span className="text-sm font-medium text-amber-dark">大纲摘要</span>
+                    </div>
+                    <p className="text-sm text-ink-muted font-literary leading-relaxed">{selected.outline_summary}</p>
+                  </div>
+                )}
 
                 {/* Review panel */}
                 {showReview && reviewResult && reviewResult.discussion && (
