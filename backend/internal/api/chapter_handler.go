@@ -119,7 +119,7 @@ func CreateChapter(c *gin.Context) {
 func GetChapter(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	var chapter model.Chapter
-	if err := store.GetDB().Joins("Project").Where("chapters.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&chapter).Error; err != nil {
+	if err := store.GetDB().Joins("JOIN projects ON projects.id = chapters.project_id").Where("chapters.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&chapter).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Chapter not found"})
 		return
 	}
@@ -129,7 +129,7 @@ func GetChapter(c *gin.Context) {
 func UpdateChapter(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	var chapter model.Chapter
-	if err := store.GetDB().Joins("Project").Where("chapters.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&chapter).Error; err != nil {
+	if err := store.GetDB().Joins("JOIN projects ON projects.id = chapters.project_id").Where("chapters.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&chapter).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Chapter not found"})
 		return
 	}
@@ -163,7 +163,7 @@ func UpdateChapter(c *gin.Context) {
 func DeleteChapter(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	var chapter model.Chapter
-	if err := store.GetDB().Joins("Project").Where("chapters.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&chapter).Error; err != nil {
+	if err := store.GetDB().Joins("JOIN projects ON projects.id = chapters.project_id").Where("chapters.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&chapter).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Chapter not found"})
 		return
 	}
