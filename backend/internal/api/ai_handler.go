@@ -227,9 +227,19 @@ func ExpandOutlines(c *gin.Context) {
 	}
 
 	result, err := orch.ExpandOutlines(c.Request.Context(), project.ID)
-	if err != nil {
+	if err != nil && result == nil {
+		// Complete failure — no partial result
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, result)
+	resp := gin.H{
+		"outline_ids":   result.OutlineIDs,
+		"chapter_ids":   result.ChapterIDs,
+		"chapter_count": result.ChapterCount,
+	}
+	if err != nil {
+		// Partial failure — include saved result + error info
+		resp["partial_error"] = err.Error()
+	}
+	c.JSON(http.StatusOK, resp)
 }

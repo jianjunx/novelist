@@ -141,6 +141,7 @@ type WorldSettingData struct {
 type OutlineData struct {
 	Act        int    `json:"act"`
 	ChapterNum int    `json:"chapter_num"`
+	Title      string `json:"title"`
 	Summary    string `json:"summary"`
 }
 
@@ -280,17 +281,45 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) (*SavedIDs, error) {
 	db := store.GetDB()
 
-	// Load existing context
+	// Load existing context (project info + world settings + characters + outlines)
 	mem := memory.NewMemory(projectID)
 	contextStr, err := mem.LoadLongTermMemory(ctx)
 	if err != nil {
 		contextStr = ""
 	}
 
-	// Get existing chapter count
-	var existingChapters []model.Chapter
-	db.Where("project_id = ?", projectID).Order("chapter_num").Find(&existingChapters)
-	existingCount := len(existingChapters)
+	// Get existing outlines to infer act and count
+	var existingOutlines []model.Outline
+	db.Where("project_id = ?", projectID).Order("act, chapter_num").Find(&existingOutlines)
+	existingCount := len(existingOutlines)
+
+	// Infer start act: find max act, check if current act is full (>=3 chapters)
+	maxAct := 1
+	currentActCount := 0
+	for _, o := range existingOutlines {
+		if o.Act > maxAct {
+			maxAct = o.Act
+			currentActCount = 1
+		} else if o.Act == maxAct {
+			currentActCount++
+		}
+	}
+	startAct := maxAct
+	if currentActCount >= 3 {
+		startAct = maxAct + 1
+	}
+
+	// Get last chapter content summary for context
+	var lastChapter model.Chapter
+	db.Where("project_id = ?", projectID).Order("chapter_num DESC").First(&lastChapter)
+	recentSummary := ""
+	if lastChapter.ID != uuid.Nil && lastChapter.Content != "" {
+		content := lastChapter.Content
+		if len([]rune(content)) > 200 {
+			content = string([]rune(content)[:200]) + "..."
+		}
+		recentSummary = fmt.Sprintf("\n\n最近成稿内容（第%d章前200字）：\n%s", lastChapter.ChapterNum, content)
+	}
 
 	// Get project info
 	var project model.Project
@@ -299,14 +328,16 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 	prompt := fmt.Sprintf(`你正在为小说《%s》扩写后续章节大纲。
 
 已有 %d 章大纲：
-%s
+%s%s
 
-请为接下来的内容生成 3-5 个新章节大纲，继续故事发展。章节编号从 %d 开始。
+请为接下来的内容生成 3-5 个新章节大纲，继续故事发展。
+章节编号从 %d 开始，归属第 %d 幕。
 
 必须以JSON格式输出：
-{"outlines": [{"act": %d, "chapter_num": %d, "summary": "章节概要"}]}`,
-		project.Title, existingCount, contextStr,
-		existingCount+1, 2, existingCount+1)
+{"outlines": [{"act": %d, "chapter_num": %d, "title": "章节标题（4-8字）", "summary": "章节概要"}]}`,
+		project.Title, existingCount, contextStr, recentSummary,
+		existingCount+1, startAct,
+		startAct, existingCount+1)
 
 	messages := []ai.Message{{Role: "user", Content: prompt}}
 	resp, err := agent.Chat(ctx, agent.RoleCreator, messages)
@@ -327,9 +358,17 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 		return nil, fmt.Errorf("failed to parse outlines: %w", err)
 	}
 
-	// Save new outlines and create chapters
+	// Save new outlines and create chapters, collecting errors
 	saved := &SavedIDs{}
-	for _, o := range result.Outlines {
+	var saveErrors []string
+
+	for i, o := range result.Outlines {
+		// Fallback title if AI didn't provide one
+		title := o.Title
+		if title == "" {
+			title = fmt.Sprintf("第%d章", o.ChapterNum)
+		}
+
 		outline := model.Outline{
 			ProjectID:  projectID,
 			Act:        o.Act,
@@ -337,22 +376,30 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 			Summary:    o.Summary,
 			Status:     "draft",
 		}
-		if err := store.CreateOutline(ctx, &outline); err == nil {
-			saved.OutlineIDs = append(saved.OutlineIDs, outline.ID)
-
-			chapter := model.Chapter{
-				ProjectID:  projectID,
-				OutlineID:  &outline.ID,
-				ChapterNum: o.ChapterNum,
-				Title:      fmt.Sprintf("第%d章", o.ChapterNum),
-				Status:     "draft",
-			}
-			if err := store.CreateChapter(ctx, &chapter); err == nil {
-				saved.ChapterIDs = append(saved.ChapterIDs, chapter.ID)
-			}
+		if err := store.CreateOutline(ctx, &outline); err != nil {
+			saveErrors = append(saveErrors, fmt.Sprintf("第%d条大纲保存失败: %v", i+1, err))
+			continue
 		}
+		saved.OutlineIDs = append(saved.OutlineIDs, outline.ID)
+
+		chapter := model.Chapter{
+			ProjectID:  projectID,
+			OutlineID:  &outline.ID,
+			ChapterNum: o.ChapterNum,
+			Title:      title,
+			Status:     "draft",
+		}
+		if err := store.CreateChapter(ctx, &chapter); err != nil {
+			saveErrors = append(saveErrors, fmt.Sprintf("第%d章创建失败: %v", o.ChapterNum, err))
+			continue
+		}
+		saved.ChapterIDs = append(saved.ChapterIDs, chapter.ID)
 	}
 	saved.ChapterCount = len(saved.ChapterIDs)
+
+	if len(saveErrors) > 0 {
+		return saved, fmt.Errorf("部分保存失败:\n%s", strings.Join(saveErrors, "\n"))
+	}
 
 	return saved, nil
 }
