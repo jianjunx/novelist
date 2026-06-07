@@ -78,7 +78,7 @@ DB_PASSWORD=your-password
 DB_NAME=novelist
 
 # 可选
-SERVER_PORT=8080
+SERVER_PORT=8090
 DEEPSEEK_MODEL=deepseek-chat
 
 # Embedding（语义检索需要）
