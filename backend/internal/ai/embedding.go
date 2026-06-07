@@ -23,16 +23,20 @@ type EmbeddingManager struct {
 var EmbeddingMgr *EmbeddingManager
 
 func InitEmbeddingManager(cfg *config.Config) {
-	apiKey := cfg.OpenAIKey
+	apiKey := cfg.EmbeddingAPIKey
 	baseURL := cfg.EmbeddingBaseURL
 
+	if apiKey == "" {
+		apiKey = cfg.OpenAIKey
+		if baseURL == "" {
+			baseURL = "https://api.openai.com/v1"
+		}
+	}
 	if apiKey == "" {
 		apiKey = cfg.DeepSeekKey
 		if baseURL == "" {
 			baseURL = "https://api.deepseek.com/v1"
 		}
-	} else if baseURL == "" {
-		baseURL = "https://api.openai.com/v1"
 	}
 
 	if apiKey == "" {

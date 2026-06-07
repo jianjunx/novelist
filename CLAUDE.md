@@ -82,7 +82,7 @@ SERVER_PORT=8090
 DEEPSEEK_MODEL=deepseek-chat
 
 # Embedding（语义检索需要）
-OPENAI_API_KEY=your-openai-key
+EMBEDDING_API_KEY=your-embedding-api-key
 EMBEDDING_MODEL=text-embedding-3-small
 EMBEDDING_BASE_URL=https://api.openai.com/v1
 ```

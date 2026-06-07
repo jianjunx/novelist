@@ -17,6 +17,7 @@ type Config struct {
     DeepSeekKey      string
     DeepSeekModel    string
     OpenAIKey        string
+    EmbeddingAPIKey  string
     EmbeddingModel   string
     EmbeddingBaseURL string
 }
@@ -39,6 +40,7 @@ func Load() *Config {
         DeepSeekKey:      os.Getenv("DEEPSEEK_API_KEY"),
         DeepSeekModel:    getEnv("DEEPSEEK_MODEL", "deepseek-chat"),
         OpenAIKey:        os.Getenv("OPENAI_API_KEY"),
+        EmbeddingAPIKey:  os.Getenv("EMBEDDING_API_KEY"),
         EmbeddingModel:   getEnv("EMBEDDING_MODEL", "text-embedding-3-small"),
         EmbeddingBaseURL: os.Getenv("EMBEDDING_BASE_URL"),
     }
