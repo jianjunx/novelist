@@ -420,6 +420,34 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID, 
 	volumeCompleteHint := ""
 	if maxAct >= 3 && currentActCount >= 3 {
 		volumeCompleteHint = "\n\n注意：当前篇的三幕已全部完成。请在最后一条大纲的summary末尾注明【本篇已完结】。"
+	} else if startAct >= 3 {
+		// Act 3: add transition guidance
+		volumeCompleteHint = "\n\n注意：这是当前篇的第三幕（收束篇）。请在大纲中埋下伏笔和悬念，为下一篇的故事发展做好铺垫，使两篇之间自然衔接。"
+	}
+
+	// If this is not the first volume, include previous volume's ending as context
+	prevVolumeContext := ""
+	if volume.VolumeNum > 1 {
+		var prevVolume model.Volume
+		if db.Where("project_id = ? AND volume_num = ?", projectID, volume.VolumeNum-1).First(&prevVolume).Error == nil {
+			// Get last outline of previous volume
+			var prevLastOutline model.Outline
+			if db.Where("project_id = ? AND volume_id = ?", projectID, prevVolume.ID).Order("chapter_num DESC").First(&prevLastOutline).Error == nil {
+				prevVolumeContext += fmt.Sprintf("\n\n上一篇「%s」结尾大纲：\n- 第%d章: %s", prevVolume.Title, prevLastOutline.ChapterNum, prevLastOutline.Summary)
+			}
+			// Get last chapter content of previous volume
+			var prevLastChapter model.Chapter
+			db.Joins("JOIN outlines ON outlines.id = chapters.outline_id").
+				Where("chapters.project_id = ? AND outlines.volume_id = ?", projectID, prevVolume.ID).
+				Order("chapters.chapter_num DESC").First(&prevLastChapter)
+			if prevLastChapter.ID != uuid.Nil && prevLastChapter.Content != "" {
+				content := prevLastChapter.Content
+				if len([]rune(content)) > 300 {
+					content = string([]rune(content)[:300]) + "..."
+				}
+				prevVolumeContext += fmt.Sprintf("\n\n上一篇结尾内容（第%d章前300字）：\n%s", prevLastChapter.ChapterNum, content)
+			}
+		}
 	}
 
 	prompt := fmt.Sprintf(`你正在为小说《%s》的「%s」扩写后续章节大纲。
@@ -427,7 +455,7 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID, 
 当前篇进度：
 %s
 已有大纲：
-%s%s
+%s%s%s
 
 请为接下来生成 %d 个新章节大纲。
 章节编号从 %d 开始，归属第 %d 幕。优先补满当前幕，再进入下一幕。%s
@@ -436,7 +464,7 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID, 
 {"outlines": [{"act": %d, "chapter_num": %d, "title": "章节标题（4-8字）", "summary": "章节概要"}]}`,
 		project.Title, volume.Title,
 		actProgress,
-		contextStr, recentSummary,
+		contextStr, recentSummary, prevVolumeContext,
 		needCount,
 		nextChapterNum, startAct, volumeCompleteHint,
 		startAct, nextChapterNum)
