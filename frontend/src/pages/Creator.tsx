@@ -135,7 +135,7 @@ export default function Creator() {
                   )}
                 </div>
                 {/* Options */}
-                {msg.options && msg.options.length > 0 && (
+                {msg.options && msg.options.length > 0 && i === messages.length - 1 && !isStreaming && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {msg.options.map((opt, j) => (
                       <button
