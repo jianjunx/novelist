@@ -127,6 +127,26 @@ func extractJSON(s string) (string, bool) {
 	return "", false
 }
 
+// extractOptionsFromText extracts selectable options from plain text responses.
+// Handles patterns like: "1. xxx\n2. xxx", "- xxx\n- xxx", "A. xxx\nB. xxx"
+func extractOptionsFromText(text string) []string {
+	lines := strings.Split(text, "\n")
+	var options []string
+	re := regexp.MustCompile(`^\s*(?:(?:[-•*]|\d+[.、)]|[A-D][.、)])\s+|⭐\s*)(.+)$`)
+	for _, line := range lines {
+		if matches := re.FindStringSubmatch(strings.TrimSpace(line)); len(matches) > 1 {
+			opt := strings.TrimSpace(matches[1])
+			if len([]rune(opt)) >= 2 && len([]rune(opt)) <= 30 {
+				options = append(options, opt)
+			}
+		}
+	}
+	if len(options) < 2 {
+		return nil
+	}
+	return options
+}
+
 // CreatorChatResponse represents the structured response from Creator agent
 type CreatorChatResponse struct {
 	Content  string          `json:"content"`
@@ -209,6 +229,11 @@ func (o *Orchestrator) parseCreatorResponse(ctx context.Context, projectID uuid.
 		}
 	} else {
 		result = CreatorChatResponse{Content: resp}
+	}
+
+	// Fallback: if no options parsed, try to extract from plain text lists.
+	if len(result.Options) == 0 {
+		result.Options = extractOptionsFromText(result.Content)
 	}
 
 	if result.Complete && result.Data != nil && projectID != uuid.Nil {

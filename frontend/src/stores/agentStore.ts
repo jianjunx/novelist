@@ -25,6 +25,18 @@ interface Message {
   saved_ids?: SavedIDs
 }
 
+function extractOptionsFromText(text: string): string[] | undefined {
+  const options: string[] = []
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim()
+    const m = trimmed.match(/^(?:(?:[-•*]|\d+[.、)]|[A-D][.、)])\s+|⭐\s*)(.+)$/)
+    if (m && m[1].trim().length >= 2 && m[1].trim().length <= 30) {
+      options.push(m[1].trim())
+    }
+  }
+  return options.length >= 2 ? options : undefined
+}
+
 function parseAssistantContent(content: string): Message {
   try {
     const data = JSON.parse(content)
@@ -33,14 +45,14 @@ function parseAssistantContent(content: string): Message {
         role: 'agent',
         content: data.content,
         agent: 'creator',
-        options: data.options,
+        options: data.options?.length ? data.options : extractOptionsFromText(data.content),
         complete: data.complete,
         data: data.data,
         saved_ids: data.saved_ids,
       }
     }
   } catch { /* raw text fallback */ }
-  return { role: 'agent', content, agent: 'creator' }
+  return { role: 'agent', content, agent: 'creator', options: extractOptionsFromText(content) }
 }
 
 function isFinalChunk(chunk: { final?: boolean }): boolean {

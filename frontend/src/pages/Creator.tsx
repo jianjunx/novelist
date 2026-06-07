@@ -44,6 +44,16 @@ export default function Creator() {
     await sendMessage(projectId, option)
   }
 
+  const needsOptions = (content: string, options?: string[]) => {
+    if (options && options.length > 0) return false
+    return /请选择|选择|选项|哪种|哪个|倾向于|你更|方向|类型|风格/.test(content)
+  }
+
+  const handleFixOptions = async (content: string) => {
+    if (!projectId) return
+    await sendMessage(projectId, `请重新按JSON格式返回以下内容，必须在options数组中提供多个选项（推荐的用⭐标记）：\n\n${content}`)
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-parchment-gradient">
       {/* Header */}
@@ -137,15 +147,37 @@ export default function Creator() {
                 {/* Options */}
                 {msg.options && msg.options.length > 0 && i === messages.length - 1 && !isStreaming && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {msg.options.map((opt, j) => (
-                      <button
-                        key={j}
-                        onClick={() => handleOptionClick(opt)}
-                        className="px-4 py-2 bg-white border border-amber/30 text-amber-dark rounded-full text-sm font-literary hover:bg-amber/5 hover:border-amber/50 transition-all duration-200 shadow-sm hover:shadow-md"
-                      >
-                        {opt}
-                      </button>
-                    ))}
+                    {msg.options.map((opt, j) => {
+                      const isRecommended = opt.startsWith('⭐')
+                      const label = isRecommended ? opt.slice(1) : opt
+                      return (
+                        <button
+                          key={j}
+                          onClick={() => handleOptionClick(opt)}
+                          className={`px-4 py-2 rounded-full text-sm font-literary transition-all duration-200 shadow-sm hover:shadow-md ${
+                            isRecommended
+                              ? 'bg-amber/10 border-2 border-amber/50 text-amber-dark font-medium hover:bg-amber/20 hover:border-amber/70'
+                              : 'bg-white border border-parchment-deep/30 text-ink-muted hover:bg-amber/5 hover:border-amber/50'
+                          }`}
+                        >
+                          {isRecommended && <span className="mr-1">⭐</span>}{label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {/* Fix options button */}
+                {msg.role === 'agent' && i === messages.length - 1 && !isStreaming && needsOptions(msg.content, msg.options) && (
+                  <div className="mt-3">
+                    <button
+                      onClick={() => handleFixOptions(msg.content)}
+                      className="px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-full text-sm font-literary hover:bg-red-100 hover:border-red-300 transition-all duration-200"
+                    >
+                      <svg className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      回复格式异常，点击重新获取选项
+                    </button>
                   </div>
                 )}
               </div>
