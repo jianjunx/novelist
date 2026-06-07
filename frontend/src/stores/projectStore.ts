@@ -67,6 +67,7 @@ interface ProjectState {
   reviewAndRevise: (chapterId: string) => Promise<ReviewResult>
   expandOutlines: (projectId: string) => Promise<void>
   deleteProject: (projectId: string) => Promise<void>
+  updateProject: (projectId: string, data: Partial<Project>) => Promise<void>
   setCurrentProject: (p: Project | null) => void
   clearReviewResult: () => void
 }
@@ -142,6 +143,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   deleteProject: async (projectId) => {
     await api.delete(`/projects/${projectId}`)
     set({ projects: get().projects.filter((p) => p.id !== projectId && p.short_id !== projectId) })
+  },
+  updateProject: async (projectId, data) => {
+    const { data: updated } = await api.put(`/projects/${projectId}`, data)
+    set({
+      projects: get().projects.map((p) => (p.id === projectId || p.short_id === projectId ? { ...p, ...updated } : p)),
+      currentProject: get().currentProject?.id === projectId || get().currentProject?.short_id === projectId
+        ? { ...get().currentProject!, ...updated }
+        : get().currentProject,
+    })
   },
   setCurrentProject: (p) => set({ currentProject: p }),
   clearReviewResult: () => set({ reviewResult: null }),
