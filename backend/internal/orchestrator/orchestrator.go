@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
@@ -725,6 +726,30 @@ func (o *Orchestrator) reviseChapter(ctx context.Context, chapterID uuid.UUID, c
 	store.GetDB().Create(&model.Discussion{
 		ChapterID: chapterID, RoundNum: 0, AgentRole: "reviser",
 		Content: "内容已根据反馈修改",
+	})
+
+	return revised, nil
+}
+
+// ApplyFeedback revises chapter content based on a provided discussion result.
+func (o *Orchestrator) ApplyFeedback(ctx context.Context, chapterID uuid.UUID, discussion *DiscussionResult) (string, error) {
+	var chapter model.Chapter
+	if err := store.GetDB().Where("id = ?", chapterID).First(&chapter).Error; err != nil {
+		return "", fmt.Errorf("chapter not found: %w", err)
+	}
+	if chapter.Content == "" {
+		return "", fmt.Errorf("chapter has no content to revise")
+	}
+
+	revised, err := o.reviseChapter(ctx, chapterID, chapter.Content, discussion)
+	if err != nil {
+		return "", err
+	}
+
+	// Save revised content
+	store.UpdateChapter(ctx, chapterID, map[string]interface{}{
+		"content":    revised,
+		"word_count": utf8.RuneCountInString(revised),
 	})
 
 	return revised, nil

@@ -291,6 +291,10 @@ export default function ChapterEditor() {
         <DiscussionPanel
           chapterId={chapterId}
           onClose={() => setShowDiscussion(false)}
+          onApply={(revisedContent) => {
+            setContent(revisedContent)
+            setSaved(false)
+          }}
         />
       )}
     </div>

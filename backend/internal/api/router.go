@@ -59,6 +59,7 @@ func SetupRouter(r *gin.Engine) {
 		protected.POST("/chapters/:id/continue", ContinueWriting)
 		protected.POST("/chapters/:id/polish", PolishContent)
 		protected.POST("/chapters/:id/discuss", StartDiscussion)
+		protected.POST("/chapters/:id/apply-feedback", ApplyFeedback)
 		protected.GET("/ws", HandleWebSocket)
 	}
 }

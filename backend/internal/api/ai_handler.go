@@ -218,6 +218,31 @@ func ReviewAndRevise(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// ApplyFeedback revises chapter content based on provided discussion feedback
+func ApplyFeedback(c *gin.Context) {
+	chapterID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chapter ID"})
+		return
+	}
+
+	var req struct {
+		Discussion *orchestrator.DiscussionResult `json:"discussion"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Discussion == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing discussion data"})
+		return
+	}
+
+	revised, err := orch.ApplyFeedback(c.Request.Context(), chapterID, req.Discussion)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"revised_content": revised})
+}
+
 // ExpandOutlines generates additional chapter outlines for a project
 func ExpandOutlines(c *gin.Context) {
 	userID, _ := c.Get("user_id")

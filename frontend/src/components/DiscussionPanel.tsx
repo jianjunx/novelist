@@ -1,7 +1,26 @@
+import { useState } from 'react'
 import { useDiscussionStore } from '../stores/discussionStore'
+import api from '../api/client'
 
-export default function DiscussionPanel({ chapterId, onClose }: { chapterId: string; onClose: () => void }) {
+export default function DiscussionPanel({ chapterId, onClose, onApply }: { chapterId: string; onClose: () => void; onApply?: (revisedContent: string) => void }) {
   const { result, isDiscussing, startDiscussion } = useDiscussionStore()
+  const [applying, setApplying] = useState(false)
+
+  const handleApply = async () => {
+    if (!result || !onApply) return
+    setApplying(true)
+    try {
+      const { data } = await api.post<{ revised_content: string }>(`/chapters/${chapterId}/apply-feedback`, {
+        discussion: result,
+      })
+      onApply(data.revised_content)
+      onClose()
+    } catch {
+      // silently fail, user can retry
+    } finally {
+      setApplying(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -148,6 +167,34 @@ export default function DiscussionPanel({ chapterId, onClose }: { chapterId: str
                   <div className="px-5 py-4">
                     <p className="text-sm text-ink-light leading-relaxed font-literary whitespace-pre-wrap">{result.critic_analysis}</p>
                   </div>
+                </div>
+              )}
+
+              {/* Apply button */}
+              {onApply && (
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={handleApply}
+                    disabled={applying}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-sage text-white rounded-lg hover:bg-sage/90 transition-colors disabled:opacity-50 shadow-md shadow-sage/20"
+                  >
+                    {applying ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <span className="text-sm font-medium">应用中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                        <span className="text-sm font-medium">应用建议</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
             </div>
