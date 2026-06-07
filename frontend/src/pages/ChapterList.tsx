@@ -9,11 +9,12 @@ export default function ChapterList() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const {
-    currentProject, chapters, isLoading, isGenerating, isReviewing, isExpanding,
-    reviewResult, fetchProject, fetchChapters, generateChapter,
-    reviewAndRevise, expandOutlines, clearReviewResult,
+    currentProject, chapters, volumes, isLoading, isGenerating, isReviewing, isExpanding,
+    reviewResult, fetchProject, fetchChapters, fetchVolumes, generateChapter,
+    reviewAndRevise, expandOutlines, createVolume, clearReviewResult,
   } = useProjectStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [expandedVolumes, setExpandedVolumes] = useState<Set<string>>(new Set())
   const [showReview, setShowReview] = useState(false)
   const [showRename, setShowRename] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -24,9 +25,18 @@ export default function ChapterList() {
     if (projectId) {
       fetchProject(projectId)
       fetchChapters(projectId)
+      fetchVolumes(projectId)
     }
     return () => clearReviewResult()
   }, [projectId])
+
+  // Auto-expand the latest volume
+  useEffect(() => {
+    if (volumes.length > 0 && expandedVolumes.size === 0) {
+      const latest = volumes[volumes.length - 1]
+      setExpandedVolumes(new Set([latest.id]))
+    }
+  }, [volumes])
 
   // Auto-select first chapter when chapters load
   useEffect(() => {
@@ -43,6 +53,39 @@ export default function ChapterList() {
   const selected = chapters.find(c => c.id === selectedId)
   const selectedHasContent = selected?.content && selected.content.length > 0
   const busy = isGenerating || isReviewing
+
+  // Group chapters by volume
+  const chaptersByVolume = chapters.reduce<Record<string, typeof chapters>>((acc, ch) => {
+    const key = ch.volume_id || '__default'
+    if (!acc[key]) acc[key] = []
+    acc[key].push(ch)
+    return acc
+  }, {})
+
+  const toggleVolume = (volId: string) => {
+    setExpandedVolumes(prev => {
+      const next = new Set(prev)
+      if (next.has(volId)) next.delete(volId)
+      else next.add(volId)
+      return next
+    })
+  }
+
+  const handleNewVolume = async () => {
+    if (!projectId) return
+    await createVolume(projectId)
+    await fetchVolumes(projectId)
+  }
+
+  // Check if latest volume is complete (3 acts, each with >= 2 outlines)
+  const latestVolume = volumes[volumes.length - 1]
+  const latestVolumeChapters = latestVolume ? (chaptersByVolume[latestVolume.id] || []) : []
+  const latestVolumeActCounts = latestVolumeChapters.reduce<Record<number, number>>((acc, ch) => {
+    // We don't have act info directly on chapters, so estimate from volume outlines
+    return acc
+  }, {})
+  // Simple heuristic: if latest volume has >= 6 chapters, consider it complete
+  const latestVolumeComplete = latestVolumeChapters.length >= 6
 
   const handleGenerate = async (chapterId: string) => {
     setShowReview(false)
@@ -137,47 +180,117 @@ export default function ChapterList() {
         <div className="flex-1 flex overflow-hidden">
           {/* Left: Chapter list sidebar */}
           <aside className="w-80 border-r border-parchment-deep/30 bg-white/50 overflow-y-auto shrink-0">
-            <div className="p-4 space-y-1">
-              {chapters.map((ch) => {
-                const hasContent = ch.content && ch.content.length > 0
-                const isActive = ch.id === selectedId
+            <div className="p-4 space-y-3">
+              {/* Volume-grouped chapters */}
+              {volumes.map((vol) => {
+                const volChapters = chaptersByVolume[vol.id] || []
+                const isExpanded = expandedVolumes.has(vol.id)
+                const isLatest = vol.id === latestVolume?.id
                 return (
-                  <button
-                    key={ch.id}
-                    onClick={() => { setSelectedId(ch.id); clearReviewResult(); setShowReview(false) }}
-                    className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 group ${
-                      isActive
-                        ? 'bg-amber/10 border border-amber/20 shadow-sm'
-                        : 'hover:bg-parchment-dark border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-md text-xs font-serif font-semibold shrink-0 ${
-                        isActive ? 'bg-amber text-white' : 'bg-parchment-dark text-ink-muted'
-                      }`}>
-                        {ch.chapter_num}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm font-medium truncate ${isActive ? 'text-amber-dark' : 'text-ink'}`}>
-                            {ch.title}
-                          </span>
-                          {hasContent ? (
-                            <span className="w-1.5 h-1.5 rounded-full bg-sage shrink-0" />
-                          ) : ch.can_generate ? (
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0" />
-                          ) : (
-                            <span className="w-1.5 h-1.5 rounded-full bg-warm-gray-light shrink-0" />
-                          )}
-                        </div>
-                        {ch.outline_summary && (
-                          <p className="text-xs text-warm-gray truncate mt-0.5">{ch.outline_summary}</p>
-                        )}
+                  <div key={vol.id}>
+                    {/* Volume header */}
+                    <button
+                      onClick={() => toggleVolume(vol.id)}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-parchment-dark transition-colors"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 text-warm-gray transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                      >
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                      <span className="text-sm font-serif font-semibold text-ink flex-1 text-left">{vol.title}</span>
+                      <span className="text-xs text-warm-gray">{volChapters.length}章</span>
+                      {isLatest && <span className="text-xs px-1.5 py-0.5 bg-amber/10 text-amber-dark rounded">当前</span>}
+                    </button>
+
+                    {/* Chapter list */}
+                    {isExpanded && (
+                      <div className="ml-2 mt-1 space-y-0.5 border-l-2 border-parchment-deep/20 pl-3">
+                        {volChapters.map((ch) => {
+                          const hasContent = ch.content && ch.content.length > 0
+                          const isActive = ch.id === selectedId
+                          return (
+                            <button
+                              key={ch.id}
+                              onClick={() => { setSelectedId(ch.id); clearReviewResult(); setShowReview(false) }}
+                              className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                                isActive
+                                  ? 'bg-amber/10 border border-amber/20 shadow-sm'
+                                  : 'hover:bg-parchment-dark border border-transparent'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs font-serif font-semibold shrink-0 ${
+                                  isActive ? 'bg-amber text-white' : 'bg-parchment-dark text-ink-muted'
+                                }`}>
+                                  {ch.chapter_num}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`text-sm truncate ${isActive ? 'text-amber-dark font-medium' : 'text-ink'}`}>
+                                      {ch.title}
+                                    </span>
+                                    {hasContent ? (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-sage shrink-0" />
+                                    ) : ch.can_generate ? (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0" />
+                                    ) : (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-warm-gray-light shrink-0" />
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          )
+                        })}
                       </div>
-                    </div>
-                  </button>
+                    )}
+                  </div>
                 )
               })}
+
+              {/* Fallback for chapters without volume (backward compat) */}
+              {chaptersByVolume['__default'] && chaptersByVolume['__default'].length > 0 && (
+                <div>
+                  <div className="px-3 py-2 text-sm font-serif font-semibold text-ink">未分篇</div>
+                  <div className="ml-2 space-y-0.5 border-l-2 border-parchment-deep/20 pl-3">
+                    {chaptersByVolume['__default'].map((ch) => {
+                      const hasContent = ch.content && ch.content.length > 0
+                      const isActive = ch.id === selectedId
+                      return (
+                        <button
+                          key={ch.id}
+                          onClick={() => { setSelectedId(ch.id); clearReviewResult(); setShowReview(false) }}
+                          className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+                            isActive
+                              ? 'bg-amber/10 border border-amber/20 shadow-sm'
+                              : 'hover:bg-parchment-dark border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs font-serif font-semibold shrink-0 ${
+                              isActive ? 'bg-amber text-white' : 'bg-parchment-dark text-ink-muted'
+                            }`}>
+                              {ch.chapter_num}
+                            </span>
+                            <span className={`text-sm truncate ${isActive ? 'text-amber-dark font-medium' : 'text-ink'}`}>
+                              {ch.title}
+                            </span>
+                            {hasContent ? (
+                              <span className="w-1.5 h-1.5 rounded-full bg-sage shrink-0" />
+                            ) : ch.can_generate ? (
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0" />
+                            ) : (
+                              <span className="w-1.5 h-1.5 rounded-full bg-warm-gray-light shrink-0" />
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Expand outlines button */}
               <button
@@ -202,6 +315,19 @@ export default function ChapterList() {
                   </>
                 )}
               </button>
+
+              {/* New volume button */}
+              {latestVolumeComplete && (
+                <button
+                  onClick={handleNewVolume}
+                  className="w-full mt-2 px-4 py-3 border-2 border-dashed border-sage/30 rounded-lg text-sage hover:bg-sage/5 hover:border-sage/50 transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                  </svg>
+                  <span className="text-sm font-literary">开始新的一篇</span>
+                </button>
+              )}
             </div>
           </aside>
 

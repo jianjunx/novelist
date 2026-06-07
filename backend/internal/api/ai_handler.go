@@ -226,7 +226,19 @@ func ExpandOutlines(c *gin.Context) {
 		return
 	}
 
-	result, err := orch.ExpandOutlines(c.Request.Context(), project.ID)
+	// Accept optional volume_id
+	var req struct {
+		VolumeID *string `json:"volume_id"`
+	}
+	c.ShouldBindJSON(&req) // ignore error, body is optional
+
+	var volumeUUID *uuid.UUID
+	if req.VolumeID != nil {
+		vid := uuid.MustParse(*req.VolumeID)
+		volumeUUID = &vid
+	}
+
+	result, err := orch.ExpandOutlines(c.Request.Context(), project.ID, volumeUUID)
 	if err != nil && result == nil {
 		// Complete failure — no partial result
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

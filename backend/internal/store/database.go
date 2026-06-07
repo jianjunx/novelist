@@ -24,6 +24,7 @@ func InitDB(dsn string) {
 	if err := DB.AutoMigrate(
 		&model.User{},
 		&model.Project{},
+		&model.Volume{},
 		&model.Character{},
 		&model.WorldSetting{},
 		&model.Outline{},

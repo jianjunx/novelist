@@ -36,6 +36,13 @@ func buildWorkingMemory(chapter *model.Chapter) string {
 			var outline model.Outline
 			if db.Where("id = ?", *chapter.OutlineID).First(&outline).Error == nil {
 				parts = append(parts, fmt.Sprintf("大纲要点：%s", outline.Summary))
+				// Add volume context
+				if outline.VolumeID != nil {
+					var volume model.Volume
+					if db.Where("id = ?", *outline.VolumeID).First(&volume).Error == nil {
+						parts = append(parts, fmt.Sprintf("所属篇章：%s", volume.Title))
+					}
+				}
 			}
 		} else {
 			var outline model.Outline
@@ -115,6 +122,7 @@ type SavedIDs struct {
 	WorldSettingIDs []uuid.UUID `json:"world_setting_ids,omitempty"`
 	OutlineIDs      []uuid.UUID `json:"outline_ids,omitempty"`
 	ChapterIDs      []uuid.UUID `json:"chapter_ids,omitempty"`
+	VolumeID        *uuid.UUID  `json:"volume_id,omitempty"`
 	ChapterCount    int         `json:"chapter_count,omitempty"`
 }
 
@@ -220,6 +228,13 @@ func (o *Orchestrator) FinalizeCreatorChat(ctx context.Context, projectID uuid.U
 func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UUID, data *BrainstormData) (*SavedIDs, error) {
 	saved := &SavedIDs{}
 
+	// Get or create default volume (第一篇)
+	volume, err := store.GetOrCreateDefaultVolume(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get/create volume: %w", err)
+	}
+	saved.VolumeID = &volume.ID
+
 	// Save characters
 	for _, c := range data.Characters {
 		char := model.Character{
@@ -251,6 +266,7 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 	for _, o := range data.Outlines {
 		outline := model.Outline{
 			ProjectID:  projectID,
+			VolumeID:   &volume.ID,
 			Act:        o.Act,
 			ChapterNum: o.ChapterNum,
 			Summary:    o.Summary,
@@ -302,9 +318,30 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 	return saved, nil
 }
 
-// ExpandOutlines generates additional chapter outlines for a project
-func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) (*SavedIDs, error) {
+// ExpandOutlines generates additional chapter outlines for a project.
+// If volumeID is nil, uses the latest volume for the project.
+func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID, volumeID *uuid.UUID) (*SavedIDs, error) {
 	db := store.GetDB()
+
+	// Resolve volume
+	var volume *model.Volume
+	if volumeID != nil {
+		var err error
+		volume, err = store.GetVolume(ctx, *volumeID)
+		if err != nil {
+			return nil, fmt.Errorf("volume not found: %w", err)
+		}
+	} else {
+		var err error
+		volume, err = store.GetLatestVolume(ctx, projectID)
+		if err != nil {
+			// No volume yet, create default
+			volume, err = store.GetOrCreateDefaultVolume(ctx, projectID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get/create volume: %w", err)
+			}
+		}
+	}
 
 	// Load existing context (project info + world settings + characters + outlines)
 	mem := memory.NewMemory(projectID)
@@ -313,9 +350,9 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 		contextStr = ""
 	}
 
-	// Get existing outlines to infer act and count
+	// Get existing outlines for this volume to infer act and count
 	var existingOutlines []model.Outline
-	db.Where("project_id = ?", projectID).Order("act, chapter_num").Find(&existingOutlines)
+	db.Where("project_id = ? AND volume_id = ?", projectID, volume.ID).Order("act, chapter_num").Find(&existingOutlines)
 	existingCount := len(existingOutlines)
 
 	// Infer start act: find max act, check if current act is full (>=3 chapters)
@@ -334,6 +371,11 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 		startAct = maxAct + 1
 	}
 
+	// Get global max chapter_num for this project
+	var maxChapterNum int
+	db.Model(&model.Chapter{}).Where("project_id = ?", projectID).Select("COALESCE(MAX(chapter_num), 0)").Scan(&maxChapterNum)
+	nextChapterNum := maxChapterNum + 1
+
 	// Get last chapter content summary for context
 	var lastChapter model.Chapter
 	db.Where("project_id = ?", projectID).Order("chapter_num DESC").First(&lastChapter)
@@ -350,7 +392,7 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 	var project model.Project
 	db.Where("id = ?", projectID).First(&project)
 
-	prompt := fmt.Sprintf(`你正在为小说《%s》扩写后续章节大纲。
+	prompt := fmt.Sprintf(`你正在为小说《%s》的「%s」扩写后续章节大纲。
 
 已有 %d 章大纲：
 %s%s
@@ -360,9 +402,9 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 
 必须以JSON格式输出：
 {"outlines": [{"act": %d, "chapter_num": %d, "title": "章节标题（4-8字）", "summary": "章节概要"}]}`,
-		project.Title, existingCount, contextStr, recentSummary,
-		existingCount+1, startAct,
-		startAct, existingCount+1)
+		project.Title, volume.Title, existingCount, contextStr, recentSummary,
+		nextChapterNum, startAct,
+		startAct, nextChapterNum)
 
 	messages := []ai.Message{{Role: "user", Content: prompt}}
 	resp, err := agent.Chat(ctx, agent.RoleCreator, messages)
@@ -398,6 +440,7 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 
 		outline := model.Outline{
 			ProjectID:  projectID,
+			VolumeID:   &volume.ID,
 			Act:        o.Act,
 			ChapterNum: o.ChapterNum,
 			Summary:    o.Summary,

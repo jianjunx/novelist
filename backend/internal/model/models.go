@@ -35,6 +35,17 @@ type Project struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type Volume struct {
+	ID          uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	ProjectID   uuid.UUID `gorm:"type:uuid;index" json:"project_id"`
+	VolumeNum   int       `gorm:"not null" json:"volume_num"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Status      string    `gorm:"default:draft" json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 type Character struct {
 	ID            uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	ProjectID     uuid.UUID `gorm:"type:uuid;index" json:"project_id"`
@@ -58,9 +69,10 @@ type WorldSetting struct {
 }
 
 type Outline struct {
-	ID         uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	ProjectID  uuid.UUID `gorm:"type:uuid;index" json:"project_id"`
-	Act        int       `json:"act"`
+	ID         uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	ProjectID  uuid.UUID  `gorm:"type:uuid;index" json:"project_id"`
+	VolumeID   *uuid.UUID `gorm:"type:uuid;index" json:"volume_id"`
+	Act        int        `json:"act"`
 	ChapterNum int       `json:"chapter_num"`
 	Summary    string    `json:"summary"`
 	KeyEvents  datatypes.JSON  `gorm:"type:jsonb" json:"key_events"`

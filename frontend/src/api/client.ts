@@ -46,6 +46,7 @@ export interface CreatorChatChunk {
     world_setting_ids?: string[]
     outline_ids?: string[]
     chapter_ids?: string[]
+    volume_id?: string
   }
   error?: string
 }

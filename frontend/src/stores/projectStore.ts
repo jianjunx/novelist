@@ -16,6 +16,17 @@ interface Project {
   first_chapter_id: string | null
 }
 
+interface Volume {
+  id: string
+  project_id: string
+  volume_num: number
+  title: string
+  description: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
 interface Chapter {
   id: string
   project_id: string
@@ -26,6 +37,9 @@ interface Chapter {
   word_count: number
   status: string
   outline_summary: string
+  volume_id: string | null
+  volume_num: number
+  volume_title: string
   can_generate: boolean
 }
 
@@ -54,6 +68,7 @@ interface ProjectState {
   projects: Project[]
   currentProject: Project | null
   chapters: Chapter[]
+  volumes: Volume[]
   isLoading: boolean
   isGenerating: boolean
   isReviewing: boolean
@@ -62,7 +77,9 @@ interface ProjectState {
   fetchProjects: () => Promise<void>
   fetchProject: (id: string) => Promise<void>
   fetchChapters: (projectId: string) => Promise<void>
+  fetchVolumes: (projectId: string) => Promise<void>
   createProject: (d: Partial<Project>) => Promise<Project>
+  createVolume: (projectId: string) => Promise<Volume>
   generateChapter: (chapterId: string) => Promise<ReviewResult>
   reviewAndRevise: (chapterId: string) => Promise<ReviewResult>
   expandOutlines: (projectId: string) => Promise<void>
@@ -76,6 +93,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [],
   currentProject: null,
   chapters: [],
+  volumes: [],
   isLoading: false,
   isGenerating: false,
   isReviewing: false,
@@ -94,9 +112,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const { data } = await api.get(`/projects/${projectId}/chapters`)
     set({ chapters: data })
   },
+  fetchVolumes: async (projectId) => {
+    const { data } = await api.get(`/projects/${projectId}/volumes`)
+    set({ volumes: data })
+  },
   createProject: async (d) => {
     const { data } = await api.post('/projects', d)
     set({ projects: [data, ...get().projects] })
+    return data
+  },
+  createVolume: async (projectId) => {
+    const { data } = await api.post(`/projects/${projectId}/volumes`)
+    set({ volumes: [...get().volumes, data] })
     return data
   },
   generateChapter: async (chapterId) => {

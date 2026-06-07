@@ -17,11 +17,14 @@ type CreateChapterRequest struct {
 	Content    string  `json:"content"`
 }
 
-// ChapterWithOutline extends Chapter with outline summary and generation availability
+// ChapterWithOutline extends Chapter with outline summary, volume info, and generation availability
 type ChapterWithOutline struct {
 	model.Chapter
-	OutlineSummary string `json:"outline_summary"`
-	CanGenerate    bool   `json:"can_generate"`
+	OutlineSummary string  `json:"outline_summary"`
+	VolumeID       *string `json:"volume_id"`
+	VolumeNum      int     `json:"volume_num"`
+	VolumeTitle    string  `json:"volume_title"`
+	CanGenerate    bool    `json:"can_generate"`
 }
 
 func GetChapters(c *gin.Context) {
@@ -38,8 +41,20 @@ func GetChapters(c *gin.Context) {
 	var outlines []model.Outline
 	store.GetDB().Where("project_id = ?", project.ID).Find(&outlines)
 	outlineMap := make(map[uuid.UUID]string)
+	outlineVolumeMap := make(map[uuid.UUID]*uuid.UUID)
 	for _, o := range outlines {
 		outlineMap[o.ID] = o.Summary
+		if o.VolumeID != nil {
+			outlineVolumeMap[o.ID] = o.VolumeID
+		}
+	}
+
+	// Load volumes for this project
+	var volumes []model.Volume
+	store.GetDB().Where("project_id = ?", project.ID).Order("volume_num").Find(&volumes)
+	volumeMap := make(map[uuid.UUID]model.Volume)
+	for _, v := range volumes {
+		volumeMap[v.ID] = v
 	}
 
 	// Build response with outline_summary and can_generate
@@ -51,6 +66,14 @@ func GetChapters(c *gin.Context) {
 		}
 		if ch.OutlineID != nil {
 			cwo.OutlineSummary = outlineMap[*ch.OutlineID]
+			if vid, ok := outlineVolumeMap[*ch.OutlineID]; ok && vid != nil {
+				vidStr := vid.String()
+				cwo.VolumeID = &vidStr
+				if v, ok := volumeMap[*vid]; ok {
+					cwo.VolumeNum = v.VolumeNum
+					cwo.VolumeTitle = v.Title
+				}
+			}
 		}
 		// First chapter can always generate; others need previous chapter to have content
 		if i == 0 {

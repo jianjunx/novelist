@@ -35,6 +35,8 @@ func SetupRouter(r *gin.Engine) {
 			projects.POST("/:id/outlines", CreateOutline)
 			projects.POST("/:id/expand-outlines", ExpandOutlines)
 			projects.GET("/:id/conversations", GetConversations)
+			projects.GET("/:id/volumes", GetVolumes)
+			projects.POST("/:id/volumes", CreateVolume)
 		}
 		protected.GET("/chapters/:id", GetChapter)
 		protected.PUT("/chapters/:id", UpdateChapter)
@@ -45,6 +47,8 @@ func SetupRouter(r *gin.Engine) {
 		protected.DELETE("/world-settings/:id", DeleteWorldSetting)
 		protected.PUT("/outlines/:id", UpdateOutline)
 		protected.DELETE("/outlines/:id", DeleteOutline)
+		protected.PUT("/volumes/:id", UpdateVolume)
+		protected.DELETE("/volumes/:id", DeleteVolume)
 		protected.GET("/settings", GetSettings)
 		protected.PUT("/settings", UpdateSettings)
 
