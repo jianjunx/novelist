@@ -353,7 +353,6 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID, 
 	// Get existing outlines for this volume to infer act and count
 	var existingOutlines []model.Outline
 	db.Where("project_id = ? AND volume_id = ?", projectID, volume.ID).Order("act, chapter_num").Find(&existingOutlines)
-	existingCount := len(existingOutlines)
 
 	// Infer start act: find max act, check if current act is full (>=3 chapters)
 	maxAct := 1
@@ -367,8 +366,15 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID, 
 		}
 	}
 	startAct := maxAct
+	needCount := 3 // default: fill up to 3 chapters in current act
 	if currentActCount >= 3 {
 		startAct = maxAct + 1
+		needCount = 3 // new act, generate 3 chapters
+	} else {
+		needCount = 3 - currentActCount // fill remaining slots in current act
+	}
+	if needCount < 3 {
+		needCount = 3 // always generate at least 3 to keep story flowing
 	}
 
 	// Get global max chapter_num for this project
@@ -392,18 +398,47 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID, 
 	var project model.Project
 	db.Where("id = ?", projectID).First(&project)
 
+	// Build act progress info for the prompt
+	actProgress := ""
+	for a := 1; a <= maxAct; a++ {
+		count := 0
+		for _, o := range existingOutlines {
+			if o.Act == a {
+				count++
+			}
+		}
+		status := "进行中"
+		if count >= 3 {
+			status = "已完成"
+		}
+		actProgress += fmt.Sprintf("  第%d幕：%d/3章 [%s]\n", a, count, status)
+	}
+	if currentActCount >= 3 {
+		actProgress += fmt.Sprintf("  第%d幕：0/3章 [待开始]\n", startAct)
+	}
+
+	volumeCompleteHint := ""
+	if maxAct >= 3 && currentActCount >= 3 {
+		volumeCompleteHint = "\n\n注意：当前篇的三幕已全部完成。请在最后一条大纲的summary末尾注明【本篇已完结】。"
+	}
+
 	prompt := fmt.Sprintf(`你正在为小说《%s》的「%s」扩写后续章节大纲。
 
-已有 %d 章大纲：
+当前篇进度：
+%s
+已有大纲：
 %s%s
 
-请为接下来的内容生成 3-5 个新章节大纲，继续故事发展。
-章节编号从 %d 开始，归属第 %d 幕。
+请为接下来生成 %d 个新章节大纲。
+章节编号从 %d 开始，归属第 %d 幕。优先补满当前幕，再进入下一幕。%s
 
 必须以JSON格式输出：
 {"outlines": [{"act": %d, "chapter_num": %d, "title": "章节标题（4-8字）", "summary": "章节概要"}]}`,
-		project.Title, volume.Title, existingCount, contextStr, recentSummary,
-		nextChapterNum, startAct,
+		project.Title, volume.Title,
+		actProgress,
+		contextStr, recentSummary,
+		needCount,
+		nextChapterNum, startAct, volumeCompleteHint,
 		startAct, nextChapterNum)
 
 	messages := []ai.Message{{Role: "user", Content: prompt}}

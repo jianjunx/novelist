@@ -15,6 +15,7 @@ export default function ChapterList() {
   } = useProjectStore()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [expandedVolumes, setExpandedVolumes] = useState<Set<string>>(new Set())
+  const [volumeComplete, setVolumeComplete] = useState(false)
   const [showReview, setShowReview] = useState(false)
   const [showRename, setShowRename] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -77,15 +78,10 @@ export default function ChapterList() {
     await fetchVolumes(projectId)
   }
 
-  // Check if latest volume is complete (3 acts, each with >= 2 outlines)
   const latestVolume = volumes[volumes.length - 1]
   const latestVolumeChapters = latestVolume ? (chaptersByVolume[latestVolume.id] || []) : []
-  const latestVolumeActCounts = latestVolumeChapters.reduce<Record<number, number>>((acc, ch) => {
-    // We don't have act info directly on chapters, so estimate from volume outlines
-    return acc
-  }, {})
-  // Simple heuristic: if latest volume has >= 6 chapters, consider it complete
-  const latestVolumeComplete = latestVolumeChapters.length >= 6
+  // Use backend-reported volume_complete, or fall back to chapter count heuristic
+  const latestVolumeComplete = volumeComplete || latestVolumeChapters.length >= 6
 
   const handleGenerate = async (chapterId: string) => {
     setShowReview(false)
@@ -294,8 +290,11 @@ export default function ChapterList() {
 
               {/* Expand outlines button */}
               <button
-                onClick={() => expandOutlines(projectId!)}
-                disabled={isExpanding}
+                onClick={async () => {
+                  const result = await expandOutlines(projectId!)
+                  if (result?.volume_complete) setVolumeComplete(true)
+                }}
+                disabled={isExpanding || latestVolumeComplete}
                 className="w-full mt-3 px-4 py-3 border-2 border-dashed border-parchment-deep/40 rounded-lg text-warm-gray hover:text-amber-dark hover:border-amber/30 transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isExpanding ? (
@@ -305,6 +304,13 @@ export default function ChapterList() {
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
                     <span className="text-sm">生成中...</span>
+                  </>
+                ) : latestVolumeComplete ? (
+                  <>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                    <span className="text-sm font-literary">当前篇已完成</span>
                   </>
                 ) : (
                   <>

@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jj/novelist/internal/ai"
+	"github.com/jj/novelist/internal/model"
 	"github.com/jj/novelist/internal/orchestrator"
 	"github.com/jj/novelist/internal/store"
 )
@@ -244,10 +245,24 @@ func ExpandOutlines(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Check volume completion status
+	volumeComplete := false
+	if result.VolumeID != nil {
+		var outlines []model.Outline
+		store.GetDB().Where("project_id = ? AND volume_id = ?", project.ID, *result.VolumeID).Find(&outlines)
+		actCounts := map[int]int{}
+		for _, o := range outlines {
+			actCounts[o.Act]++
+		}
+		volumeComplete = actCounts[1] >= 2 && actCounts[2] >= 2 && actCounts[3] >= 2
+	}
+
 	resp := gin.H{
-		"outline_ids":   result.OutlineIDs,
-		"chapter_ids":   result.ChapterIDs,
-		"chapter_count": result.ChapterCount,
+		"outline_ids":     result.OutlineIDs,
+		"chapter_ids":     result.ChapterIDs,
+		"chapter_count":   result.ChapterCount,
+		"volume_complete": volumeComplete,
 	}
 	if err != nil {
 		// Partial failure — include saved result + error info

@@ -82,7 +82,7 @@ interface ProjectState {
   createVolume: (projectId: string) => Promise<Volume>
   generateChapter: (chapterId: string) => Promise<ReviewResult>
   reviewAndRevise: (chapterId: string) => Promise<ReviewResult>
-  expandOutlines: (projectId: string) => Promise<void>
+  expandOutlines: (projectId: string) => Promise<{ volume_complete: boolean }>
   deleteProject: (projectId: string) => Promise<void>
   updateProject: (projectId: string, data: Partial<Project>) => Promise<void>
   setCurrentProject: (p: Project | null) => void
@@ -161,8 +161,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   expandOutlines: async (projectId) => {
     set({ isExpanding: true })
     try {
-      await api.post(`/projects/${projectId}/expand-outlines`)
+      const { data } = await api.post(`/projects/${projectId}/expand-outlines`)
       await get().fetchChapters(projectId)
+      return { volume_complete: data.volume_complete || false }
     } finally {
       set({ isExpanding: false })
     }
