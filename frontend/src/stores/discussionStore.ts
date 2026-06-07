@@ -16,6 +16,11 @@ interface DiscussionResult {
   aggregated: Suggestion[]
 }
 
+interface MultiRoundDiscussionResult {
+  total_rounds: number
+  rounds: Record<string, DiscussionResult>
+}
+
 interface DiscussionState {
   result: DiscussionResult | null
   isDiscussing: boolean
@@ -29,8 +34,11 @@ export const useDiscussionStore = create<DiscussionState>((set) => ({
   startDiscussion: async (chapterId) => {
     set({ isDiscussing: true, result: null })
     try {
-      const { data } = await api.post(`/chapters/${chapterId}/discuss`)
-      set({ result: data, isDiscussing: false })
+      const { data } = await api.post<MultiRoundDiscussionResult>(`/chapters/${chapterId}/discuss`)
+      // Extract the last round's result
+      const rounds = data.rounds || {}
+      const lastRound = rounds[String(data.total_rounds)] || rounds['1'] || null
+      set({ result: lastRound, isDiscussing: false })
     } catch {
       set({ isDiscussing: false })
     }
