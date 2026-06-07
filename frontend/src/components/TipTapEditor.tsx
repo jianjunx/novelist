@@ -1,6 +1,7 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
+import { Markdown } from 'tiptap-markdown'
 import { forwardRef, useEffect, useImperativeHandle } from 'react'
 
 export interface TipTapEditorHandle {
@@ -22,15 +23,21 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
     extensions: [
       StarterKit,
       Placeholder.configure({ placeholder }),
+      Markdown.configure({
+        html: false,
+        transformPastedText: true,
+        transformCopiedText: true,
+      }),
     ],
     content,
     onUpdate: ({ editor }) => {
-      onChange(editor.getText())
+      const md = editor.storage.markdown.getMarkdown()
+      onChange(md)
     },
   })
 
   useEffect(() => {
-    if (editor && content !== editor.getText()) {
+    if (editor && content !== editor.storage.markdown.getMarkdown()) {
       editor.commands.setContent(content)
     }
   }, [content, editor])
@@ -60,6 +67,8 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
     { divider: true },
     { icon: '—', action: () => editor.chain().focus().setHorizontalRule().run(), title: '分割线' },
     { icon: '"', action: () => editor.chain().focus().toggleBlockquote().run(), active: editor.isActive('blockquote'), title: '引用' },
+    { label: '•', action: () => editor.chain().focus().toggleBulletList().run(), active: editor.isActive('bulletList'), title: '无序列表' },
+    { label: '1.', action: () => editor.chain().focus().toggleOrderedList().run(), active: editor.isActive('orderedList'), title: '有序列表' },
   ]
 
   return (
@@ -92,6 +101,16 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
         className="prose prose-lg max-w-none p-8 min-h-[500px] font-literary leading-loose focus:outline-none
           [&_.tiptap]:focus:outline-none
           [&_.tiptap]:min-h-[480px]
+          [&_.tiptap_h2]:font-serif [&_.tiptap_h2]:text-2xl [&_.tiptap_h2]:font-bold [&_.tiptap_h2]:text-ink [&_.tiptap_h2]:mt-8 [&_.tiptap_h2]:mb-4
+          [&_.tiptap_h3]:font-serif [&_.tiptap_h3]:text-xl [&_.tiptap_h3]:font-semibold [&_.tiptap_h3]:text-ink [&_.tiptap_h3]:mt-6 [&_.tiptap_h3]:mb-3
+          [&_.tiptap_p]:text-ink-light [&_.tiptap_p]:leading-relaxed [&_.tiptap_p]:mb-4
+          [&_.tiptap_strong]:text-ink [&_.tiptap_strong]:font-semibold
+          [&_.tiptap_em]:text-ink-muted
+          [&_.tiptap_blockquote]:border-l-4 [&_.tiptap_blockquote]:border-amber/40 [&_.tiptap_blockquote]:pl-4 [&_.tiptap_blockquote]:italic [&_.tiptap_blockquote]:text-ink-muted
+          [&_.tiptap_hr]:border-parchment-deep/30 [&_.tiptap_hr]:my-8
+          [&_.tiptap_ul]:list-disc [&_.tiptap_ul]:pl-6 [&_.tiptap_ul]:mb-4
+          [&_.tiptap_ol]:list-decimal [&_.tiptap_ol]:pl-6 [&_.tiptap_ol]:mb-4
+          [&_.tiptap_li]:text-ink-light [&_.tiptap_li]:mb-1
           [&_.tiptap_p.is-editor-empty:first-child::before]:text-warm-gray
           [&_.tiptap_p.is-editor-empty:first-child::before]:font-literary
           [&_.tiptap_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]
