@@ -26,33 +26,15 @@ func NewOrchestrator() *Orchestrator {
 	return &Orchestrator{}
 }
 
-// getChapterVolumeID resolves the volume ID for a chapter via its outline
-func getChapterVolumeID(chapter *model.Chapter) *uuid.UUID {
-	db := store.GetDB()
-	if db == nil {
-		return nil
-	}
-	if chapter.OutlineID != nil {
-		var outline model.Outline
-		if db.Where("id = ?", *chapter.OutlineID).First(&outline).Error == nil {
-			return outline.VolumeID
-		}
-	}
-	var outline model.Outline
-	if db.Where("project_id = ? AND chapter_num = ?", chapter.ProjectID, chapter.ChapterNum).First(&outline).Error == nil {
-		return outline.VolumeID
-	}
-	return nil
-}
-
-// buildWorkingMemory extracts keywords from chapter content and outline for semantic search
-func buildWorkingMemory(chapter *model.Chapter) string {
+// buildWorkingMemory extracts keywords from chapter content and outline for semantic search.
+// Also returns the resolved volumeID for callers that need it.
+func buildWorkingMemory(chapter *model.Chapter) (string, *uuid.UUID) {
 	var parts []string
 	parts = append(parts, fmt.Sprintf("当前章节：第%d章 %s", chapter.ChapterNum, chapter.Title))
 
+	var volumeID *uuid.UUID
 	db := store.GetDB()
 	if db != nil {
-		var volumeID *uuid.UUID
 		if chapter.OutlineID != nil {
 			var outline model.Outline
 			if db.Where("id = ?", *chapter.OutlineID).First(&outline).Error == nil {
@@ -91,7 +73,16 @@ func buildWorkingMemory(chapter *model.Chapter) string {
 		}
 	}
 
-	return strings.Join(parts, "\n")
+	// Add current chapter content (for continuation/revision)
+	if chapter.Content != "" {
+		content := chapter.Content
+		if len([]rune(content)) > 500 {
+			content = string([]rune(content)[:500]) + "..."
+		}
+		parts = append(parts, fmt.Sprintf("当前已有内容：\n%s", content))
+	}
+
+	return strings.Join(parts, "\n"), volumeID
 }
 
 // extractJSON attempts to extract a JSON object from a string that may contain
@@ -395,15 +386,8 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID, 
 		}
 	}
 	startAct := maxAct
-	needCount := 3 // default: fill up to 3 chapters in current act
 	if currentActCount >= 3 {
 		startAct = maxAct + 1
-		needCount = 3 // new act, generate 3 chapters
-	} else {
-		needCount = 3 - currentActCount // fill remaining slots in current act
-	}
-	if needCount < 3 {
-		needCount = 3 // always generate at least 3 to keep story flowing
 	}
 
 	// Get global max chapter_num for this project
@@ -494,7 +478,7 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID, 
 		project.Title, volume.Title,
 		actProgress,
 		contextStr, recentSummary, prevVolumeContext,
-		needCount,
+		3,
 		nextChapterNum, startAct, volumeCompleteHint,
 		startAct, nextChapterNum)
 
@@ -574,10 +558,10 @@ func (o *Orchestrator) GenerateChapter(ctx context.Context, chapterID uuid.UUID)
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
-	if vid := getChapterVolumeID(&chapter); vid != nil {
+	workingMemory, vid := buildWorkingMemory(&chapter)
+	if vid != nil {
 		mem.WithVolume(*vid)
 	}
-	workingMemory := buildWorkingMemory(&chapter)
 	contextStr, err := mem.AssembleContext(ctx, chapter.ChapterNum, workingMemory)
 	if err != nil {
 		return "", err
@@ -598,10 +582,10 @@ func (o *Orchestrator) ContinueWriting(ctx context.Context, chapterID uuid.UUID,
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
-	if vid := getChapterVolumeID(&chapter); vid != nil {
+	workingMemory, vid := buildWorkingMemory(&chapter)
+	if vid != nil {
 		mem.WithVolume(*vid)
 	}
-	workingMemory := buildWorkingMemory(&chapter)
 	if currentContent != "" {
 		workingMemory += "\n续写起点：" + currentContent
 	}
@@ -654,10 +638,10 @@ func (o *Orchestrator) StartDiscussion(ctx context.Context, chapterID uuid.UUID)
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
-	if vid := getChapterVolumeID(&chapter); vid != nil {
+	workingMemory, vid := buildWorkingMemory(&chapter)
+	if vid != nil {
 		mem.WithVolume(*vid)
 	}
-	workingMemory := buildWorkingMemory(&chapter)
 	contextStr, _ := mem.AssembleContext(ctx, chapter.ChapterNum, workingMemory)
 
 	reviewPrompt := fmt.Sprintf("请审查以下章节：\n\n%s\n\n章节内容：\n%s", contextStr, chapter.Content)
@@ -784,10 +768,12 @@ func (o *Orchestrator) ApplyFeedback(ctx context.Context, chapterID uuid.UUID, d
 	}
 
 	// Save revised content
-	store.UpdateChapter(ctx, chapterID, map[string]interface{}{
+	if err := store.UpdateChapter(ctx, chapterID, map[string]interface{}{
 		"content":    revised,
 		"word_count": utf8.RuneCountInString(revised),
-	})
+	}); err != nil {
+		return "", fmt.Errorf("failed to save revised content: %w", err)
+	}
 
 	return revised, nil
 }
@@ -815,10 +801,10 @@ func (o *Orchestrator) StartDiscussionWithRound(ctx context.Context, chapterID u
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
-	if vid := getChapterVolumeID(&chapter); vid != nil {
+	workingMemory, vid := buildWorkingMemory(&chapter)
+	if vid != nil {
 		mem.WithVolume(*vid)
 	}
-	workingMemory := buildWorkingMemory(&chapter)
 	contextStr, _ := mem.AssembleContext(ctx, chapter.ChapterNum, workingMemory)
 
 	var reviewPrompt string

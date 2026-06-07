@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -112,7 +113,10 @@ func DeleteVolume(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
-	store.DeleteVolume(c.Request.Context(), volume.ID)
+	if err := store.DeleteVolume(c.Request.Context(), volume.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete volume"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Volume deleted"})
 }
 
@@ -121,5 +125,5 @@ func defaultVolumeTitle(n int) string {
 	if n >= 1 && n <= len(titles) {
 		return titles[n-1]
 	}
-	return "第" + string(rune('0'+n)) + "篇"
+	return fmt.Sprintf("第%d篇", n)
 }

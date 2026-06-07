@@ -260,7 +260,11 @@ func ExpandOutlines(c *gin.Context) {
 
 	var volumeUUID *uuid.UUID
 	if req.VolumeID != nil {
-		vid := uuid.MustParse(*req.VolumeID)
+		vid, err := uuid.Parse(*req.VolumeID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid volume_id"})
+			return
+		}
 		volumeUUID = &vid
 	}
 
@@ -280,7 +284,7 @@ func ExpandOutlines(c *gin.Context) {
 		for _, o := range outlines {
 			actCounts[o.Act]++
 		}
-		volumeComplete = actCounts[1] >= 2 && actCounts[2] >= 2 && actCounts[3] >= 2
+		volumeComplete = actCounts[1] >= 3 && actCounts[2] >= 3 && actCounts[3] >= 3
 		if volumeComplete {
 			store.GenerateVolumeSummary(c.Request.Context(), *result.VolumeID)
 		}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useProjectStore } from '../stores/projectStore'
 import type { ReviewResult } from '../stores/projectStore'
@@ -203,43 +203,14 @@ export default function ChapterList() {
                     {/* Chapter list */}
                     {isExpanded && (
                       <div className="ml-2 mt-1 space-y-0.5 border-l-2 border-parchment-deep/20 pl-3">
-                        {volChapters.map((ch) => {
-                          const hasContent = ch.content && ch.content.length > 0
-                          const isActive = ch.id === selectedId
-                          return (
-                            <button
-                              key={ch.id}
-                              onClick={() => { setSelectedId(ch.id); clearReviewResult(); setShowReview(false) }}
-                              className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
-                                isActive
-                                  ? 'bg-amber/10 border border-amber/20 shadow-sm'
-                                  : 'hover:bg-parchment-dark border border-transparent'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs font-serif font-semibold shrink-0 ${
-                                  isActive ? 'bg-amber text-white' : 'bg-parchment-dark text-ink-muted'
-                                }`}>
-                                  {ch.chapter_num}
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className={`text-sm truncate ${isActive ? 'text-amber-dark font-medium' : 'text-ink'}`}>
-                                      {ch.title}
-                                    </span>
-                                    {hasContent ? (
-                                      <span className="w-1.5 h-1.5 rounded-full bg-sage shrink-0" />
-                                    ) : ch.can_generate ? (
-                                      <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0" />
-                                    ) : (
-                                      <span className="w-1.5 h-1.5 rounded-full bg-warm-gray-light shrink-0" />
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                          )
-                        })}
+                        {volChapters.map((ch) => (
+                          <ChapterItem
+                            key={ch.id}
+                            ch={ch}
+                            isActive={ch.id === selectedId}
+                            onSelect={() => { setSelectedId(ch.id); clearReviewResult(); setShowReview(false) }}
+                          />
+                        ))}
                       </div>
                     )}
                   </div>
@@ -251,39 +222,14 @@ export default function ChapterList() {
                 <div>
                   <div className="px-3 py-2 text-sm font-serif font-semibold text-ink">未分篇</div>
                   <div className="ml-2 space-y-0.5 border-l-2 border-parchment-deep/20 pl-3">
-                    {chaptersByVolume['__default'].map((ch) => {
-                      const hasContent = ch.content && ch.content.length > 0
-                      const isActive = ch.id === selectedId
-                      return (
-                        <button
-                          key={ch.id}
-                          onClick={() => { setSelectedId(ch.id); clearReviewResult(); setShowReview(false) }}
-                          className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
-                            isActive
-                              ? 'bg-amber/10 border border-amber/20 shadow-sm'
-                              : 'hover:bg-parchment-dark border border-transparent'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs font-serif font-semibold shrink-0 ${
-                              isActive ? 'bg-amber text-white' : 'bg-parchment-dark text-ink-muted'
-                            }`}>
-                              {ch.chapter_num}
-                            </span>
-                            <span className={`text-sm truncate ${isActive ? 'text-amber-dark font-medium' : 'text-ink'}`}>
-                              {ch.title}
-                            </span>
-                            {hasContent ? (
-                              <span className="w-1.5 h-1.5 rounded-full bg-sage shrink-0" />
-                            ) : ch.can_generate ? (
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0" />
-                            ) : (
-                              <span className="w-1.5 h-1.5 rounded-full bg-warm-gray-light shrink-0" />
-                            )}
-                          </div>
-                        </button>
-                      )
-                    })}
+                    {chaptersByVolume['__default'].map((ch) => (
+                      <ChapterItem
+                        key={ch.id}
+                        ch={ch}
+                        isActive={ch.id === selectedId}
+                        onSelect={() => { setSelectedId(ch.id); clearReviewResult(); setShowReview(false) }}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
@@ -520,6 +466,36 @@ export default function ChapterList() {
         </div>
       )}
     </div>
+  )
+}
+
+function ChapterItem({ ch, isActive, onSelect }: { ch: { id: string; chapter_num: number; title: string; content: string; can_generate: boolean }; isActive: boolean; onSelect: () => void }) {
+  const hasContent = ch.content && ch.content.length > 0
+  return (
+    <button
+      onClick={onSelect}
+      className={`w-full text-left px-3 py-2 rounded-lg transition-all duration-200 ${
+        isActive ? 'bg-amber/10 border border-amber/20 shadow-sm' : 'hover:bg-parchment-dark border border-transparent'
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs font-serif font-semibold shrink-0 ${
+          isActive ? 'bg-amber text-white' : 'bg-parchment-dark text-ink-muted'
+        }`}>
+          {ch.chapter_num}
+        </span>
+        <span className={`text-sm truncate flex-1 ${isActive ? 'text-amber-dark font-medium' : 'text-ink'}`}>
+          {ch.title}
+        </span>
+        {hasContent ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-sage shrink-0" />
+        ) : ch.can_generate ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-amber shrink-0" />
+        ) : (
+          <span className="w-1.5 h-1.5 rounded-full bg-warm-gray-light shrink-0" />
+        )}
+      </div>
+    </button>
   )
 }
 
