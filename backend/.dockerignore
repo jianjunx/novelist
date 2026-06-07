@@ -1,0 +1,5 @@
+**/*_test.go
+**/.git
+**/node_modules
+**/.env
+**/tmp
