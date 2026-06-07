@@ -107,7 +107,7 @@ func TestBuildWorkingMemory_WithTitle(t *testing.T) {
 		Title:      "初遇",
 		Content:    "这是一个故事的开始...",
 	}
-	result := buildWorkingMemory(chapter)
+	result, _ := buildWorkingMemory(chapter)
 	if !contains(result, "第1章") {
 		t.Error("buildWorkingMemory() missing chapter number")
 	}
@@ -124,7 +124,7 @@ func TestBuildWorkingMemory_NoContent(t *testing.T) {
 		ChapterNum: 2,
 		Title:      "空白章节",
 	}
-	result := buildWorkingMemory(chapter)
+	result, _ := buildWorkingMemory(chapter)
 	if !contains(result, "第2章") {
 		t.Error("buildWorkingMemory() missing chapter number")
 	}
@@ -148,7 +148,7 @@ func TestBuildWorkingMemory_LongContent(t *testing.T) {
 		Title:      "长章节",
 		Content:    longContent,
 	}
-	result := buildWorkingMemory(chapter)
+	result, _ := buildWorkingMemory(chapter)
 	// Should be truncated to 500 chars
 	if contains(result, longContent) {
 		t.Error("buildWorkingMemory() should truncate content longer than 500 runes")
