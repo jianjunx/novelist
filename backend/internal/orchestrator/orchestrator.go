@@ -280,6 +280,25 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 	}
 
 	saved.ChapterCount = len(saved.ChapterIDs)
+
+	// Update project description from outlines
+	if len(data.Outlines) > 0 {
+		var parts []string
+		for _, o := range data.Outlines {
+			if o.Summary != "" {
+				parts = append(parts, o.Summary)
+			}
+		}
+		if len(parts) > 0 {
+			desc := strings.Join(parts, "；")
+			// Truncate to 200 chars to keep it concise
+			if len(desc) > 200 {
+				desc = desc[:200] + "……"
+			}
+			store.GetDB().Model(&model.Project{}).Where("id = ?", projectID).Update("description", desc)
+		}
+	}
+
 	return saved, nil
 }
 
