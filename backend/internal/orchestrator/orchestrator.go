@@ -260,11 +260,17 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 			saved.OutlineIDs = append(saved.OutlineIDs, outline.ID)
 
 			// Create a chapter for each outline entry
+			title := o.Title
+			if title == "" {
+				title = fmt.Sprintf("第%d章", o.ChapterNum)
+			} else {
+				title = fmt.Sprintf("第%d章-%s", o.ChapterNum, title)
+			}
 			chapter := model.Chapter{
 				ProjectID:  projectID,
 				OutlineID:  &outline.ID,
 				ChapterNum: o.ChapterNum,
-				Title:      fmt.Sprintf("第%d章", o.ChapterNum),
+				Title:      title,
 				Status:     "draft",
 			}
 			if err := store.CreateChapter(ctx, &chapter); err == nil {
@@ -363,10 +369,12 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID) 
 	var saveErrors []string
 
 	for i, o := range result.Outlines {
-		// Fallback title if AI didn't provide one
+		// Format title as "第N章-标题"
 		title := o.Title
 		if title == "" {
 			title = fmt.Sprintf("第%d章", o.ChapterNum)
+		} else {
+			title = fmt.Sprintf("第%d章-%s", o.ChapterNum, title)
 		}
 
 		outline := model.Outline{

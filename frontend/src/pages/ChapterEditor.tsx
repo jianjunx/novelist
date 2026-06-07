@@ -174,7 +174,7 @@ export default function ChapterEditor() {
             </button>
             <div>
               <h1 className="text-lg font-serif font-semibold text-ink">
-                {chapter ? `第${chapter.chapter_num}章 ${chapter.title}` : '章节编辑'}
+                {chapter ? chapter.title : '章节编辑'}
               </h1>
               <div className="flex items-center gap-2 text-xs text-warm-gray font-literary">
                 <span>{content.length} 字</span>

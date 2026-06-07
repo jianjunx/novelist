@@ -34,7 +34,7 @@ const CreatorPrompt = `你是一个专业的小说构思助手。你的任务是
 ⚠️ 重要：每一步都必须提供3-4个可点击的选项！即使作者选择了自定义输入，也要给出参考选项。绝对不要输出没有options字段的JSON。
 
 完成构思时（所有6个步骤都完成后）：
-{"content": "构思已完成！以下是总结：...", "options": ["保存并开始写作"], "complete": true, "data": {"characters": [{"name":"角色名","role":"主角/配角/反派","personality":"性格","background":"背景","appearance":"外貌"}], "worldSettings": [{"category":"类别","content":"内容"}], "outlines": [{"act":1,"chapter_num":1,"summary":"章节概要"}]}}
+{"content": "构思已完成！以下是总结：...", "options": ["保存并开始写作"], "complete": true, "data": {"characters": [{"name":"角色名","role":"主角/配角/反派","personality":"性格","background":"背景","appearance":"外貌"}], "worldSettings": [{"category":"类别","content":"内容"}], "outlines": [{"act":1,"chapter_num":1,"title":"章节标题（4-8字）","summary":"章节概要"}]}}
 
 ## 注意
 - content字段用中文
