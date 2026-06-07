@@ -15,6 +15,9 @@ type Querier interface {
 	GetWorldSettings(projectID uuid.UUID) ([]model.WorldSetting, error)
 	GetCharacters(projectID uuid.UUID) ([]model.Character, error)
 	GetOutlines(projectID uuid.UUID) ([]model.Outline, error)
+	GetVolumesByProject(projectID uuid.UUID) ([]model.Volume, error)
+	GetVolume(id uuid.UUID) (*model.Volume, error)
+	GetChaptersByVolume(projectID uuid.UUID, volumeID uuid.UUID) ([]model.Chapter, error)
 	GetChaptersBefore(projectID uuid.UUID, chapterNum int, limit int) ([]model.Chapter, error)
 	GetChaptersWithEmbedding(projectID uuid.UUID, limit int) ([]model.Character, []model.WorldSetting, []model.Outline, []model.Chapter, error)
 }
@@ -48,6 +51,26 @@ func (s *StoreQuerier) GetOutlines(projectID uuid.UUID) ([]model.Outline, error)
 	return outlines, nil
 }
 
+func (s *StoreQuerier) GetVolumesByProject(projectID uuid.UUID) ([]model.Volume, error) {
+	var volumes []model.Volume
+	store.GetDB().Where("project_id = ?", projectID).Order("volume_num").Find(&volumes)
+	return volumes, nil
+}
+
+func (s *StoreQuerier) GetVolume(id uuid.UUID) (*model.Volume, error) {
+	var volume model.Volume
+	err := store.GetDB().Where("id = ?", id).First(&volume).Error
+	return &volume, err
+}
+
+func (s *StoreQuerier) GetChaptersByVolume(projectID uuid.UUID, volumeID uuid.UUID) ([]model.Chapter, error) {
+	var chapters []model.Chapter
+	store.GetDB().Joins("JOIN outlines ON outlines.id = chapters.outline_id").
+		Where("chapters.project_id = ? AND outlines.volume_id = ?", projectID, volumeID).
+		Order("chapters.chapter_num").Find(&chapters)
+	return chapters, nil
+}
+
 func (s *StoreQuerier) GetChaptersBefore(projectID uuid.UUID, chapterNum int, limit int) ([]model.Chapter, error) {
 	var chapters []model.Chapter
 	store.GetDB().Where("project_id = ? AND chapter_num < ?", projectID, chapterNum).
@@ -66,6 +89,7 @@ func (s *StoreQuerier) GetChaptersWithEmbedding(projectID uuid.UUID, limit int) 
 
 type Memory struct {
 	ProjectID uuid.UUID
+	VolumeID  *uuid.UUID // optional: scope short-term memory to a volume
 	q         Querier
 }
 
@@ -77,7 +101,12 @@ func NewMemory(projectID uuid.UUID, q ...Querier) *Memory {
 	return &Memory{ProjectID: projectID, q: querier}
 }
 
-// LoadLongTermMemory loads project info, world settings, outlines, and characters
+func (m *Memory) WithVolume(volumeID uuid.UUID) *Memory {
+	m.VolumeID = &volumeID
+	return m
+}
+
+// LoadLongTermMemory loads project info, world settings, outlines (grouped by volume), and characters
 func (m *Memory) LoadLongTermMemory(ctx context.Context) (string, error) {
 	project, err := m.q.GetProject(m.ProjectID)
 	if err != nil {
@@ -87,6 +116,7 @@ func (m *Memory) LoadLongTermMemory(ctx context.Context) (string, error) {
 	settings, _ := m.q.GetWorldSettings(m.ProjectID)
 	outlines, _ := m.q.GetOutlines(m.ProjectID)
 	characters, _ := m.q.GetCharacters(m.ProjectID)
+	volumes, _ := m.q.GetVolumesByProject(m.ProjectID)
 
 	result := fmt.Sprintf("## 项目信息\n标题: %s\n类型: %s\n风格: %s\n\n", project.Title, project.Genre, project.StyleGuide)
 
@@ -100,22 +130,89 @@ func (m *Memory) LoadLongTermMemory(ctx context.Context) (string, error) {
 		result += fmt.Sprintf("- %s（%s）: %s, %s\n", c.Name, c.Role, c.Personality, c.Background)
 	}
 
+	// Group outlines by volume
+	outlineVolumeMap := map[uuid.UUID]string{} // volume_id -> title
+	for _, v := range volumes {
+		outlineVolumeMap[v.ID] = v.Title
+	}
+
 	result += "\n## 故事大纲\n"
-	for _, o := range outlines {
-		result += fmt.Sprintf("- 第%d章: %s\n", o.ChapterNum, o.Summary)
+	if len(volumes) > 0 {
+		// Group by volume
+		volumeOutlines := map[string][]model.Outline{}
+		for _, o := range outlines {
+			volTitle := "未分篇"
+			if o.VolumeID != nil {
+				if t, ok := outlineVolumeMap[*o.VolumeID]; ok {
+					volTitle = t
+				}
+			}
+			volumeOutlines[volTitle] = append(volumeOutlines[volTitle], o)
+		}
+		for _, v := range volumes {
+			ols := volumeOutlines[v.Title]
+			if len(ols) == 0 {
+				continue
+			}
+			summaryLine := ""
+			if v.Summary != "" {
+				summaryLine = fmt.Sprintf("（%s）", v.Summary)
+			}
+			result += fmt.Sprintf("### %s%s\n", v.Title, summaryLine)
+			for _, o := range ols {
+				result += fmt.Sprintf("  - 第%d章 [第%d幕]: %s\n", o.ChapterNum, o.Act, o.Summary)
+			}
+		}
+		// Fallback for ungrouped
+		if ungrouped := volumeOutlines["未分篇"]; len(ungrouped) > 0 {
+			result += "### 未分篇\n"
+			for _, o := range ungrouped {
+				result += fmt.Sprintf("  - 第%d章 [第%d幕]: %s\n", o.ChapterNum, o.Act, o.Summary)
+			}
+		}
+	} else {
+		for _, o := range outlines {
+			result += fmt.Sprintf("- 第%d章: %s\n", o.ChapterNum, o.Summary)
+		}
 	}
 
 	return result, nil
 }
 
-// LoadShortTermMemory loads recent chapters
+// LoadShortTermMemory loads chapters from the current volume (or recent chapters as fallback)
 func (m *Memory) LoadShortTermMemory(ctx context.Context, currentChapterNum int) (string, error) {
-	chapters, _ := m.q.GetChaptersBefore(m.ProjectID, currentChapterNum, 5)
+	var chapters []model.Chapter
 
-	result := "## 近期章节\n"
+	if m.VolumeID != nil {
+		// Volume-scoped: load all chapters in this volume before current
+		allVolChapters, _ := m.q.GetChaptersByVolume(m.ProjectID, *m.VolumeID)
+		for _, c := range allVolChapters {
+			if c.ChapterNum < currentChapterNum {
+				chapters = append(chapters, c)
+			}
+		}
+		// Keep last 10 if too many
+		if len(chapters) > 10 {
+			chapters = chapters[len(chapters)-10:]
+		}
+	} else {
+		// Fallback: recent 5 chapters
+		chapters, _ = m.q.GetChaptersBefore(m.ProjectID, currentChapterNum, 5)
+	}
+
+	if len(chapters) == 0 {
+		return "", nil
+	}
+
+	result := "## 本篇前文\n"
 	for i := len(chapters) - 1; i >= 0; i-- {
 		c := chapters[i]
-		result += fmt.Sprintf("\n### 第%d章 %s\n%s\n", c.ChapterNum, c.Title, c.Content)
+		// Truncate long content
+		content := c.Content
+		if len([]rune(content)) > 500 {
+			content = string([]rune(content)[:500]) + "..."
+		}
+		result += fmt.Sprintf("\n### 第%d章 %s\n%s\n", c.ChapterNum, c.Title, content)
 	}
 	return result, nil
 }

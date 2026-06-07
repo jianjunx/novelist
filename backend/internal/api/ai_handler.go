@@ -271,7 +271,7 @@ func ExpandOutlines(c *gin.Context) {
 		return
 	}
 
-	// Check volume completion status
+	// Check volume completion status and auto-generate summary
 	volumeComplete := false
 	if result.VolumeID != nil {
 		var outlines []model.Outline
@@ -281,6 +281,9 @@ func ExpandOutlines(c *gin.Context) {
 			actCounts[o.Act]++
 		}
 		volumeComplete = actCounts[1] >= 2 && actCounts[2] >= 2 && actCounts[3] >= 2
+		if volumeComplete {
+			store.GenerateVolumeSummary(c.Request.Context(), *result.VolumeID)
+		}
 	}
 
 	resp := gin.H{

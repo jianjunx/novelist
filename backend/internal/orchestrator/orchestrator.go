@@ -26,6 +26,25 @@ func NewOrchestrator() *Orchestrator {
 	return &Orchestrator{}
 }
 
+// getChapterVolumeID resolves the volume ID for a chapter via its outline
+func getChapterVolumeID(chapter *model.Chapter) *uuid.UUID {
+	db := store.GetDB()
+	if db == nil {
+		return nil
+	}
+	if chapter.OutlineID != nil {
+		var outline model.Outline
+		if db.Where("id = ?", *chapter.OutlineID).First(&outline).Error == nil {
+			return outline.VolumeID
+		}
+	}
+	var outline model.Outline
+	if db.Where("project_id = ? AND chapter_num = ?", chapter.ProjectID, chapter.ChapterNum).First(&outline).Error == nil {
+		return outline.VolumeID
+	}
+	return nil
+}
+
 // buildWorkingMemory extracts keywords from chapter content and outline for semantic search
 func buildWorkingMemory(chapter *model.Chapter) string {
 	var parts []string
@@ -33,34 +52,43 @@ func buildWorkingMemory(chapter *model.Chapter) string {
 
 	db := store.GetDB()
 	if db != nil {
+		var volumeID *uuid.UUID
 		if chapter.OutlineID != nil {
 			var outline model.Outline
 			if db.Where("id = ?", *chapter.OutlineID).First(&outline).Error == nil {
 				parts = append(parts, fmt.Sprintf("大纲要点：%s", outline.Summary))
-				// Add volume context
-				if outline.VolumeID != nil {
-					var volume model.Volume
-					if db.Where("id = ?", *outline.VolumeID).First(&volume).Error == nil {
-						parts = append(parts, fmt.Sprintf("所属篇章：%s", volume.Title))
-					}
-				}
+				volumeID = outline.VolumeID
 			}
 		} else {
 			var outline model.Outline
 			if db.Where("project_id = ? AND chapter_num = ?", chapter.ProjectID, chapter.ChapterNum).
 				First(&outline).Error == nil {
 				parts = append(parts, fmt.Sprintf("大纲要点：%s", outline.Summary))
+				volumeID = outline.VolumeID
 			}
 		}
-	}
 
-	if chapter.Content != "" {
-		content := chapter.Content
-		runes := []rune(content)
-		if len(runes) > 500 {
-			content = string(runes[:500])
+		// Add volume context
+		if volumeID != nil {
+			var volume model.Volume
+			if db.Where("id = ?", *volumeID).First(&volume).Error == nil {
+				parts = append(parts, fmt.Sprintf("所属篇章：%s", volume.Title))
+				if volume.Summary != "" {
+					parts = append(parts, fmt.Sprintf("篇摘要：%s", volume.Summary))
+				}
+			}
 		}
-		parts = append(parts, fmt.Sprintf("章节内容：%s", content))
+
+		// Add previous chapter content for continuity
+		var prevChapter model.Chapter
+		if db.Where("project_id = ? AND chapter_num < ? AND content != ''", chapter.ProjectID, chapter.ChapterNum).
+			Order("chapter_num DESC").First(&prevChapter).Error == nil {
+			prevContent := prevChapter.Content
+			if len([]rune(prevContent)) > 300 {
+				prevContent = string([]rune(prevContent)[:300]) + "..."
+			}
+			parts = append(parts, fmt.Sprintf("上一章（第%d章）结尾：\n%s", prevChapter.ChapterNum, prevContent))
+		}
 	}
 
 	return strings.Join(parts, "\n")
@@ -546,6 +574,9 @@ func (o *Orchestrator) GenerateChapter(ctx context.Context, chapterID uuid.UUID)
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
+	if vid := getChapterVolumeID(&chapter); vid != nil {
+		mem.WithVolume(*vid)
+	}
 	workingMemory := buildWorkingMemory(&chapter)
 	contextStr, err := mem.AssembleContext(ctx, chapter.ChapterNum, workingMemory)
 	if err != nil {
@@ -567,6 +598,9 @@ func (o *Orchestrator) ContinueWriting(ctx context.Context, chapterID uuid.UUID,
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
+	if vid := getChapterVolumeID(&chapter); vid != nil {
+		mem.WithVolume(*vid)
+	}
 	workingMemory := buildWorkingMemory(&chapter)
 	if currentContent != "" {
 		workingMemory += "\n续写起点：" + currentContent
@@ -620,6 +654,9 @@ func (o *Orchestrator) StartDiscussion(ctx context.Context, chapterID uuid.UUID)
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
+	if vid := getChapterVolumeID(&chapter); vid != nil {
+		mem.WithVolume(*vid)
+	}
 	workingMemory := buildWorkingMemory(&chapter)
 	contextStr, _ := mem.AssembleContext(ctx, chapter.ChapterNum, workingMemory)
 
@@ -778,6 +815,9 @@ func (o *Orchestrator) StartDiscussionWithRound(ctx context.Context, chapterID u
 	}
 
 	mem := memory.NewMemory(chapter.ProjectID)
+	if vid := getChapterVolumeID(&chapter); vid != nil {
+		mem.WithVolume(*vid)
+	}
 	workingMemory := buildWorkingMemory(&chapter)
 	contextStr, _ := mem.AssembleContext(ctx, chapter.ChapterNum, workingMemory)
 

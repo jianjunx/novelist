@@ -41,6 +41,7 @@ type Volume struct {
 	VolumeNum   int       `gorm:"not null" json:"volume_num"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
+	Summary     string    `json:"summary"`
 	Status      string    `gorm:"default:draft" json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`

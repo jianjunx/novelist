@@ -55,3 +55,33 @@ func GetLatestVolume(ctx context.Context, projectID uuid.UUID) (*model.Volume, e
 	err := DB.Where("project_id = ?", projectID).Order("volume_num DESC").First(&volume).Error
 	return &volume, err
 }
+
+// GenerateVolumeSummary creates a summary from the volume's outlines.
+func GenerateVolumeSummary(ctx context.Context, volumeID uuid.UUID) string {
+	var outlines []model.Outline
+	DB.Where("volume_id = ?", volumeID).Order("chapter_num").Find(&outlines)
+	if len(outlines) == 0 {
+		return ""
+	}
+	var parts []string
+	for _, o := range outlines {
+		if o.Summary != "" {
+			parts = append(parts, o.Summary)
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	summary := ""
+	for i, p := range parts {
+		if i > 0 {
+			summary += "；"
+		}
+		summary += p
+	}
+	if len([]rune(summary)) > 150 {
+		summary = string([]rune(summary)[:150]) + "……"
+	}
+	DB.Model(&model.Volume{}).Where("id = ?", volumeID).Update("summary", summary)
+	return summary
+}

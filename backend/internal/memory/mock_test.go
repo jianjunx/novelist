@@ -14,6 +14,7 @@ type mockQuerier struct {
 	characters map[uuid.UUID][]model.Character
 	outlines   map[uuid.UUID][]model.Outline
 	chapters   map[uuid.UUID][]model.Chapter
+	volumes    map[uuid.UUID][]model.Volume
 }
 
 func newMockQuerier() *mockQuerier {
@@ -23,6 +24,7 @@ func newMockQuerier() *mockQuerier {
 		characters: make(map[uuid.UUID][]model.Character),
 		outlines:   make(map[uuid.UUID][]model.Outline),
 		chapters:   make(map[uuid.UUID][]model.Chapter),
+		volumes:    make(map[uuid.UUID][]model.Volume),
 	}
 }
 
@@ -51,6 +53,48 @@ func (m *mockQuerier) GetOutlines(projectID uuid.UUID) ([]model.Outline, error) 
 		return outlines[i].ChapterNum < outlines[j].ChapterNum
 	})
 	return outlines, nil
+}
+
+func (m *mockQuerier) GetVolumesByProject(projectID uuid.UUID) ([]model.Volume, error) {
+	volumes := m.volumes[projectID]
+	sort.Slice(volumes, func(i, j int) bool {
+		return volumes[i].VolumeNum < volumes[j].VolumeNum
+	})
+	return volumes, nil
+}
+
+func (m *mockQuerier) GetVolume(id uuid.UUID) (*model.Volume, error) {
+	for _, vs := range m.volumes {
+		for i := range vs {
+			if vs[i].ID == id {
+				return &vs[i], nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("volume not found")
+}
+
+func (m *mockQuerier) GetChaptersByVolume(projectID uuid.UUID, volumeID uuid.UUID) ([]model.Chapter, error) {
+	// Find outlines in this volume
+	var chapterNums []int
+	for _, o := range m.outlines[projectID] {
+		if o.VolumeID != nil && *o.VolumeID == volumeID {
+			chapterNums = append(chapterNums, o.ChapterNum)
+		}
+	}
+	var result []model.Chapter
+	for _, ch := range m.chapters[projectID] {
+		for _, cn := range chapterNums {
+			if ch.ChapterNum == cn {
+				result = append(result, ch)
+				break
+			}
+		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ChapterNum < result[j].ChapterNum
+	})
+	return result, nil
 }
 
 func (m *mockQuerier) GetChaptersBefore(projectID uuid.UUID, chapterNum int, limit int) ([]model.Chapter, error) {

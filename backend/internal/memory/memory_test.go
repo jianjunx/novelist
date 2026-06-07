@@ -150,7 +150,7 @@ func TestLoadShortTermMemory_Success(t *testing.T) {
 		t.Fatalf("LoadShortTermMemory() error: %v", err)
 	}
 
-	if !strings.Contains(result, "近期章节") {
+	if !strings.Contains(result, "本篇前文") {
 		t.Error("LoadShortTermMemory() missing header")
 	}
 	if !strings.Contains(result, "第1章") {
@@ -181,8 +181,8 @@ func TestLoadShortTermMemory_NoChapters(t *testing.T) {
 		t.Fatalf("LoadShortTermMemory() error: %v", err)
 	}
 
-	if !strings.Contains(result, "近期章节") {
-		t.Error("LoadShortTermMemory() should still have header")
+	if result != "" {
+		t.Error("LoadShortTermMemory() should return empty when no chapters")
 	}
 }
 
@@ -227,7 +227,7 @@ func TestAssembleContext_WithoutEmbedding(t *testing.T) {
 	if !strings.Contains(result, "主角") {
 		t.Error("AssembleContext() missing character info")
 	}
-	if !strings.Contains(result, "近期章节") {
+	if !strings.Contains(result, "本篇前文") {
 		t.Error("AssembleContext() missing short-term memory")
 	}
 	if !strings.Contains(result, "当前写作任务") {
