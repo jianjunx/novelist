@@ -31,13 +31,13 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
     ],
     content,
     onUpdate: ({ editor }) => {
-      const md = editor.storage.markdown.getMarkdown()
+      const md = (editor.storage as any).markdown.getMarkdown()
       onChange(md)
     },
   })
 
   useEffect(() => {
-    if (editor && content !== editor.storage.markdown.getMarkdown()) {
+    if (editor && content !== (editor.storage as any).markdown.getMarkdown()) {
       editor.commands.setContent(content)
     }
   }, [content, editor])
