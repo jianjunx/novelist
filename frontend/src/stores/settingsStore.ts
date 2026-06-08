@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import api from '../api/client'
 
+export interface ModelOption {
+  value: string
+  label: string
+  provider: string
+}
+
 export interface SettingsData {
   deepseekKey: string
   claudeKey: string
@@ -13,7 +19,9 @@ export interface SettingsData {
 interface SettingsState extends SettingsData {
   loading: boolean
   error: string | null
+  models: ModelOption[]
   fetchSettings: () => Promise<void>
+  fetchModels: () => Promise<void>
   updateSettings: (data: Partial<SettingsData>) => Promise<void>
 }
 
@@ -48,6 +56,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   discussionRounds: 1,
   loading: false,
   error: null,
+  models: [],
 
   fetchSettings: async () => {
     set({ loading: true, error: null })
@@ -58,6 +67,15 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       const err = e as { response?: { data?: { error?: string } } }
       set({ error: err.response?.data?.error || '加载设置失败', loading: false })
       throw e
+    }
+  },
+
+  fetchModels: async () => {
+    try {
+      const { data } = await api.get('/settings/models')
+      set({ models: data.models || [] })
+    } catch {
+      // 静默失败，使用空列表
     }
   },
 

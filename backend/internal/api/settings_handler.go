@@ -18,6 +18,51 @@ func GetSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, settings)
 }
 
+func GetAvailableModels(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	var settings model.Setting
+	if err := store.GetDB().Where("user_id = ?", userID).First(&settings).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"models": defaultModels()})
+		return
+	}
+
+	var models []gin.H
+	if settings.DeepSeekKey != "" {
+		models = append(models,
+			gin.H{"value": "deepseek-chat", "label": "DeepSeek Chat", "provider": "deepseek"},
+			gin.H{"value": "deepseek-reasoner", "label": "DeepSeek Reasoner", "provider": "deepseek"},
+		)
+	}
+	if settings.ClaudeKey != "" {
+		models = append(models,
+			gin.H{"value": "claude-sonnet-4-20250514", "label": "Claude Sonnet 4", "provider": "claude"},
+			gin.H{"value": "claude-haiku-4-20250414", "label": "Claude Haiku 4", "provider": "claude"},
+		)
+	}
+	if settings.OpenAIKey != "" {
+		models = append(models,
+			gin.H{"value": "gpt-4o", "label": "GPT-4o", "provider": "openai"},
+			gin.H{"value": "gpt-4o-mini", "label": "GPT-4o Mini", "provider": "openai"},
+		)
+	}
+	if settings.LocalModelURL != "" {
+		models = append(models,
+			gin.H{"value": "local-model", "label": "本地模型", "provider": "local"},
+		)
+	}
+	if len(models) == 0 {
+		models = defaultModels()
+	}
+	c.JSON(http.StatusOK, gin.H{"models": models})
+}
+
+func defaultModels() []gin.H {
+	return []gin.H{
+		{"value": "deepseek-chat", "label": "DeepSeek Chat", "provider": "deepseek"},
+		{"value": "deepseek-reasoner", "label": "DeepSeek Reasoner", "provider": "deepseek"},
+	}
+}
+
 func UpdateSettings(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	var settings model.Setting

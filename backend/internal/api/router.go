@@ -52,6 +52,7 @@ func SetupRouter(r *gin.Engine) {
 		protected.DELETE("/volumes/:id", DeleteVolume)
 		protected.GET("/settings", GetSettings)
 		protected.PUT("/settings", UpdateSettings)
+		protected.GET("/settings/models", GetAvailableModels)
 
 		protected.POST("/creator/chat", CreatorChat)
 		protected.POST("/chapters/:id/generate", GenerateChapter)

@@ -2,11 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSettingsStore } from '../stores/settingsStore'
 
-const MODEL_OPTIONS = [
-  { value: 'deepseek-chat', label: 'DeepSeek Chat' },
-  { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' },
-]
-
 function PasswordField({
   label,
   value,
@@ -55,7 +50,7 @@ function PasswordField({
 }
 
 export default function Settings() {
-  const { loading, error, fetchSettings, updateSettings } = useSettingsStore()
+  const { loading, error, models, fetchSettings, fetchModels, updateSettings } = useSettingsStore()
   const [deepseekKey, setDeepseekKey] = useState('')
   const [claudeKey, setClaudeKey] = useState('')
   const [openaiKey, setOpenaiKey] = useState('')
@@ -74,6 +69,7 @@ export default function Settings() {
       setDefaultModel(s.defaultModel)
       setDiscussionRounds(s.discussionRounds)
     }).catch(() => {})
+    fetchModels()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -191,16 +187,34 @@ export default function Settings() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-ink-light">默认模型</label>
-                <select
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-ink-light">默认模型</label>
+                  <button
+                    type="button"
+                    onClick={fetchModels}
+                    className="text-xs text-warm-gray hover:text-ink transition-colors"
+                  >
+                    刷新列表
+                  </button>
+                </div>
+                <input
+                  type="text"
                   value={defaultModel}
                   onChange={(e) => setDefaultModel(e.target.value)}
-                  className="w-full px-4 py-3 bg-parchment-dark border border-parchment-deep rounded-lg text-ink transition-all duration-200 appearance-none cursor-pointer"
-                >
-                  {MODEL_OPTIONS.map((opt) => (
+                  list="model-options"
+                  placeholder="输入或选择模型名称"
+                  className="w-full px-4 py-3 bg-parchment-dark border border-parchment-deep rounded-lg text-ink placeholder-warm-gray transition-all duration-200"
+                />
+                <datalist id="model-options">
+                  {models.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
-                </select>
+                </datalist>
+                {models.length > 0 && (
+                  <p className="text-xs text-warm-gray font-literary">
+                    已根据你的 API Key 自动加载可用模型，也可手动输入任意模型名称
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
