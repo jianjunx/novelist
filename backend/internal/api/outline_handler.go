@@ -30,16 +30,19 @@ func CreateOutline(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Act        int                    `json:"act"`
-		ChapterNum int                    `json:"chapter_num" binding:"required"`
-		Summary    string                 `json:"summary" binding:"required"`
-		KeyEvents  map[string]interface{} `json:"key_events"`
+		Act        int             `json:"act"`
+		ChapterNum int             `json:"chapter_num" binding:"required"`
+		Summary    string          `json:"summary" binding:"required"`
+		KeyEvents  json.RawMessage `json:"key_events"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	keJSON, _ := json.Marshal(req.KeyEvents)
+	keJSON := req.KeyEvents
+	if keJSON == nil {
+		keJSON = json.RawMessage("[]")
+	}
 	outline := model.Outline{
 		ProjectID:  project.ID,
 		Act:        req.Act,
@@ -62,16 +65,19 @@ func UpdateOutline(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Act        int                    `json:"act"`
-		ChapterNum int                    `json:"chapter_num"`
-		Summary    string                 `json:"summary"`
-		KeyEvents  map[string]interface{} `json:"key_events"`
+		Act        int             `json:"act"`
+		ChapterNum int             `json:"chapter_num"`
+		Summary    string          `json:"summary"`
+		KeyEvents  json.RawMessage `json:"key_events"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	keJSON, _ := json.Marshal(req.KeyEvents)
+	keJSON := req.KeyEvents
+	if keJSON == nil {
+		keJSON = json.RawMessage("[]")
+	}
 	if err := store.UpdateOutline(c.Request.Context(), outline.ID, map[string]interface{}{
 		"act":         req.Act,
 		"chapter_num": req.ChapterNum,

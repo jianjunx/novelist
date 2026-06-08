@@ -23,6 +23,7 @@ func SetupRouter(r *gin.Engine) {
 			projects.GET("", GetProjects)
 			projects.POST("", CreateProject)
 			projects.GET("/:id", GetProject)
+			projects.GET("/:id/overview", GetProjectOverview)
 			projects.PUT("/:id", UpdateProject)
 			projects.DELETE("/:id", DeleteProject)
 			projects.GET("/:id/chapters", GetChapters)

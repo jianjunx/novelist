@@ -174,11 +174,12 @@ type BrainstormData struct {
 }
 
 type CharacterData struct {
-	Name        string `json:"name"`
-	Role        string `json:"role"`
-	Personality string `json:"personality"`
-	Background  string `json:"background"`
-	Appearance  string `json:"appearance"`
+	Name          string          `json:"name"`
+	Role          string          `json:"role"`
+	Personality   string          `json:"personality"`
+	Background    string          `json:"background"`
+	Appearance    string          `json:"appearance"`
+	Relationships json.RawMessage `json:"relationships,omitempty"`
 }
 
 type WorldSettingData struct {
@@ -187,10 +188,11 @@ type WorldSettingData struct {
 }
 
 type OutlineData struct {
-	Act        int    `json:"act"`
-	ChapterNum int    `json:"chapter_num"`
-	Title      string `json:"title"`
-	Summary    string `json:"summary"`
+	Act        int             `json:"act"`
+	ChapterNum int             `json:"chapter_num"`
+	Title      string          `json:"title"`
+	Summary    string          `json:"summary"`
+	KeyEvents  json.RawMessage `json:"key_events,omitempty"`
 }
 
 func (o *Orchestrator) prepareCreatorMessages(ctx context.Context, projectID uuid.UUID, messages []ai.Message) []ai.Message {
@@ -283,12 +285,15 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 	// Save characters
 	for _, c := range data.Characters {
 		char := model.Character{
-			ProjectID:  projectID,
-			Name:       c.Name,
-			Role:       c.Role,
+			ProjectID:   projectID,
+			Name:        c.Name,
+			Role:        c.Role,
 			Personality: c.Personality,
-			Background: c.Background,
-			Appearance: c.Appearance,
+			Background:  c.Background,
+			Appearance:  c.Appearance,
+		}
+		if len(c.Relationships) > 0 {
+			char.Relationships = c.Relationships
 		}
 		if err := store.CreateCharacter(ctx, &char); err == nil {
 			saved.CharacterIDs = append(saved.CharacterIDs, char.ID)
@@ -316,6 +321,9 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 			ChapterNum: o.ChapterNum,
 			Summary:    o.Summary,
 			Status:     "draft",
+		}
+		if len(o.KeyEvents) > 0 {
+			outline.KeyEvents = o.KeyEvents
 		}
 		if err := store.CreateOutline(ctx, &outline); err == nil {
 			saved.OutlineIDs = append(saved.OutlineIDs, outline.ID)

@@ -132,3 +132,79 @@ func DeleteProject(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Project deleted"})
 }
+
+type ProjectStats struct {
+	ChapterCount int `json:"chapter_count"`
+	WrittenCount int `json:"written_count"`
+	TotalWords   int `json:"total_words"`
+}
+
+type OutlineWithChapter struct {
+	model.Outline
+	ChapterID *uuid.UUID `json:"chapter_id"`
+}
+
+type ProjectOverview struct {
+	Project       ProjectWithStatus  `json:"project"`
+	Characters    []model.Character  `json:"characters"`
+	WorldSettings []model.WorldSetting `json:"world_settings"`
+	Outlines      []OutlineWithChapter `json:"outlines"`
+	Stats         ProjectStats       `json:"stats"`
+}
+
+func GetProjectOverview(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	var result ProjectWithStatus
+	if err := store.GetDB().Raw(projectStatusSQL+"WHERE p.id = ? AND p.user_id = ?", project.ID, userID).Scan(&result).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	var characters []model.Character
+	store.GetDB().Where("project_id = ?", project.ID).Find(&characters)
+
+	var worldSettings []model.WorldSetting
+	store.GetDB().Where("project_id = ?", project.ID).Find(&worldSettings)
+
+	var outlines []model.Outline
+	store.GetDB().Where("project_id = ?", project.ID).Order("act, chapter_num").Find(&outlines)
+
+	var chapters []model.Chapter
+	store.GetDB().Where("project_id = ?", project.ID).Find(&chapters)
+
+	chapterByOutline := make(map[uuid.UUID]uuid.UUID)
+	var stats ProjectStats
+	stats.ChapterCount = len(chapters)
+	for _, ch := range chapters {
+		stats.TotalWords += ch.WordCount
+		if ch.Content != "" {
+			stats.WrittenCount++
+		}
+		if ch.OutlineID != nil {
+			chapterByOutline[*ch.OutlineID] = ch.ID
+		}
+	}
+
+	outlinesWithChapter := make([]OutlineWithChapter, 0, len(outlines))
+	for _, o := range outlines {
+		owc := OutlineWithChapter{Outline: o}
+		if chID, ok := chapterByOutline[o.ID]; ok {
+			owc.ChapterID = &chID
+		}
+		outlinesWithChapter = append(outlinesWithChapter, owc)
+	}
+
+	c.JSON(http.StatusOK, ProjectOverview{
+		Project:       result,
+		Characters:    characters,
+		WorldSettings: worldSettings,
+		Outlines:      outlinesWithChapter,
+		Stats:         stats,
+	})
+}

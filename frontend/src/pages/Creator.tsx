@@ -4,12 +4,13 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAgentStore } from '../stores/agentStore'
 import { useProjectStore } from '../stores/projectStore'
+import ProjectNav from '../components/ProjectNav'
 
 export default function Creator() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const { messages, isStreaming, sendMessage, loadConversations, clearMessages, savedIDs } = useAgentStore()
-  const { currentProject, fetchProject } = useProjectStore()
+  const { fetchProject } = useProjectStore()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -56,35 +57,20 @@ export default function Creator() {
 
   return (
     <div className="min-h-screen flex flex-col bg-parchment-gradient">
-      {/* Header */}
-      <header className="bg-white/70 backdrop-blur-md border-b border-parchment-deep/50 sticky top-0 z-40">
-        <div className="max-w-4xl mx-auto px-6 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/')}
-              className="w-8 h-8 rounded-lg bg-parchment-dark flex items-center justify-center text-ink-muted hover:text-ink hover:bg-parchment-deep transition-colors"
-            >
+      <ProjectNav
+        projectId={projectId!}
+        currentTab="creator"
+        actions={
+          savedIDs?.chapter_ids && savedIDs.chapter_ids.length > 0 ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-sage/10 text-sage border border-sage/20 rounded-lg animate-fade-in text-sm">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 12H5M12 19l-7-7 7-7" />
+                <path d="M20 6L9 17l-5-5" />
               </svg>
-            </button>
-            <div>
-              <h1 className="text-lg font-serif font-semibold text-ink">{currentProject?.title || '新项目'}</h1>
-              <p className="text-xs text-warm-gray font-literary">构思阶段</p>
+              构思已保存，正在跳转...
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {savedIDs?.chapter_ids && savedIDs.chapter_ids.length > 0 && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-sage/10 text-sage border border-sage/20 rounded-lg animate-fade-in">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-                <span className="text-sm font-medium">构思已保存，正在跳转...</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+          ) : undefined
+        }
+      />
 
       {/* Messages area */}
       <div className="flex-1 max-w-4xl mx-auto w-full px-6 py-6 flex flex-col pb-32">

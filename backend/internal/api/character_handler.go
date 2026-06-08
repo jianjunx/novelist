@@ -11,12 +11,12 @@ import (
 )
 
 type CreateCharacterRequest struct {
-	Name          string                 `json:"name" binding:"required"`
-	Role          string                 `json:"role"`
-	Personality   string                 `json:"personality"`
-	Background    string                 `json:"background"`
-	Appearance    string                 `json:"appearance"`
-	Relationships map[string]interface{} `json:"relationships"`
+	Name          string          `json:"name" binding:"required"`
+	Role          string          `json:"role"`
+	Personality   string          `json:"personality"`
+	Background    string          `json:"background"`
+	Appearance    string          `json:"appearance"`
+	Relationships json.RawMessage `json:"relationships"`
 }
 
 func GetCharacters(c *gin.Context) {
@@ -43,7 +43,10 @@ func CreateCharacter(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	relJSON, _ := json.Marshal(req.Relationships)
+	relJSON := req.Relationships
+	if relJSON == nil {
+		relJSON = json.RawMessage("[]")
+	}
 	character := model.Character{
 		ProjectID:     project.ID,
 		Name:          req.Name,
@@ -72,7 +75,10 @@ func UpdateCharacter(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	relJSON, _ := json.Marshal(req.Relationships)
+	relJSON := req.Relationships
+	if relJSON == nil {
+		relJSON = json.RawMessage("[]")
+	}
 	if err := store.UpdateCharacter(c.Request.Context(), character.ID, map[string]interface{}{
 		"name":          req.Name,
 		"role":          req.Role,

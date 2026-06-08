@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useProjectStore } from '../stores/projectStore'
 import type { ReviewResult } from '../stores/projectStore'
+import ProjectNav from '../components/ProjectNav'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -114,45 +115,21 @@ export default function ChapterList() {
 
   return (
     <div className="h-screen flex flex-col bg-parchment-gradient">
-      {/* Header */}
-      <header className="bg-white/70 backdrop-blur-md border-b border-parchment-deep/50 shrink-0 z-40">
-        <div className="max-w-[1400px] mx-auto px-6 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/')}
-              className="w-8 h-8 rounded-lg bg-parchment-dark flex items-center justify-center text-ink-muted hover:text-ink hover:bg-parchment-deep transition-colors"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 12H5M12 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-serif font-semibold text-ink">{currentProject?.title || '项目'}</h1>
-                <button
-                  onClick={() => { setNewTitle(currentProject?.title || ''); setShowRename(true) }}
-                  className="w-6 h-6 rounded flex items-center justify-center text-ink-muted hover:text-amber hover:bg-amber/10 transition-colors"
-                  title="修改名称"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                  </svg>
-                </button>
-              </div>
-              <p className="text-xs text-warm-gray font-literary">章节管理</p>
-            </div>
-          </div>
+      <ProjectNav
+        projectId={projectId!}
+        currentTab="chapters"
+        actions={
           <button
-            onClick={() => navigate(`/projects/${projectId}/creator`)}
-            className="flex items-center gap-2 px-4 py-2 text-amber-dark hover:bg-amber/5 rounded-lg transition-colors text-sm font-literary"
+            onClick={() => { setNewTitle(currentProject?.title || ''); setShowRename(true) }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:text-amber hover:bg-amber/10 transition-colors"
+            title="修改项目名称"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
             </svg>
-            继续构思
           </button>
-        </div>
-      </header>
+        }
+      />
 
       {chapters.length === 0 ? (
         <div className="flex-1 flex items-center justify-center animate-fade-in">
