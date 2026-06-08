@@ -65,28 +65,32 @@ func UpdateOutline(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Act        int             `json:"act"`
-		ChapterNum int             `json:"chapter_num"`
-		Summary    string          `json:"summary"`
-		KeyEvents  json.RawMessage `json:"key_events"`
+		Act        int              `json:"act"`
+		ChapterNum int              `json:"chapter_num"`
+		Summary    string           `json:"summary"`
+		KeyEvents  *json.RawMessage `json:"key_events"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	keJSON := req.KeyEvents
-	if keJSON == nil {
-		keJSON = json.RawMessage("[]")
-	}
-	if err := store.UpdateOutline(c.Request.Context(), outline.ID, map[string]interface{}{
+	updates := map[string]interface{}{
 		"act":         req.Act,
 		"chapter_num": req.ChapterNum,
 		"summary":     req.Summary,
-		"key_events":  datatypes.JSON(keJSON),
-	}); err != nil {
+	}
+	if req.KeyEvents != nil {
+		keJSON := *req.KeyEvents
+		if keJSON == nil {
+			keJSON = json.RawMessage("[]")
+		}
+		updates["key_events"] = datatypes.JSON(keJSON)
+	}
+	if err := store.UpdateOutline(c.Request.Context(), outline.ID, updates); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update outline"})
 		return
 	}
+	store.GetDB().Where("id = ?", outline.ID).First(&outline)
 	c.JSON(http.StatusOK, outline)
 }
 

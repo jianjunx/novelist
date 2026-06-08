@@ -19,6 +19,15 @@ type CreateCharacterRequest struct {
 	Relationships json.RawMessage `json:"relationships"`
 }
 
+type UpdateCharacterRequest struct {
+	Name          string           `json:"name" binding:"required"`
+	Role          string           `json:"role"`
+	Personality   string           `json:"personality"`
+	Background    string           `json:"background"`
+	Appearance    string           `json:"appearance"`
+	Relationships *json.RawMessage `json:"relationships"`
+}
+
 func GetCharacters(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	project, err := findProjectByParam(c.Param("id"), userID)
@@ -70,26 +79,30 @@ func UpdateCharacter(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Character not found"})
 		return
 	}
-	var req CreateCharacterRequest
+	var req UpdateCharacterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	relJSON := req.Relationships
-	if relJSON == nil {
-		relJSON = json.RawMessage("[]")
+	updates := map[string]interface{}{
+		"name":        req.Name,
+		"role":        req.Role,
+		"personality": req.Personality,
+		"background":  req.Background,
+		"appearance":  req.Appearance,
 	}
-	if err := store.UpdateCharacter(c.Request.Context(), character.ID, map[string]interface{}{
-		"name":          req.Name,
-		"role":          req.Role,
-		"personality":   req.Personality,
-		"background":    req.Background,
-		"appearance":    req.Appearance,
-		"relationships": datatypes.JSON(relJSON),
-	}); err != nil {
+	if req.Relationships != nil {
+		relJSON := *req.Relationships
+		if relJSON == nil {
+			relJSON = json.RawMessage("[]")
+		}
+		updates["relationships"] = datatypes.JSON(relJSON)
+	}
+	if err := store.UpdateCharacter(c.Request.Context(), character.ID, updates); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update character"})
 		return
 	}
+	store.GetDB().Where("id = ?", character.ID).First(&character)
 	c.JSON(http.StatusOK, character)
 }
 

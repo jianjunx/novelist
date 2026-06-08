@@ -18,6 +18,7 @@ import (
 	"github.com/jj/novelist/internal/memory"
 	"github.com/jj/novelist/internal/model"
 	"github.com/jj/novelist/internal/store"
+	"gorm.io/datatypes"
 )
 
 type Orchestrator struct{}
@@ -293,7 +294,7 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 			Appearance:  c.Appearance,
 		}
 		if len(c.Relationships) > 0 {
-			char.Relationships = c.Relationships
+			char.Relationships = datatypes.JSON(c.Relationships)
 		}
 		if err := store.CreateCharacter(ctx, &char); err == nil {
 			saved.CharacterIDs = append(saved.CharacterIDs, char.ID)
@@ -323,7 +324,7 @@ func (o *Orchestrator) saveBrainstormData(ctx context.Context, projectID uuid.UU
 			Status:     "draft",
 		}
 		if len(o.KeyEvents) > 0 {
-			outline.KeyEvents = o.KeyEvents
+			outline.KeyEvents = datatypes.JSON(o.KeyEvents)
 		}
 		if err := store.CreateOutline(ctx, &outline); err == nil {
 			saved.OutlineIDs = append(saved.OutlineIDs, outline.ID)
@@ -554,6 +555,9 @@ func (o *Orchestrator) ExpandOutlines(ctx context.Context, projectID uuid.UUID, 
 			ChapterNum: o.ChapterNum,
 			Summary:    o.Summary,
 			Status:     "draft",
+		}
+		if len(o.KeyEvents) > 0 {
+			outline.KeyEvents = datatypes.JSON(o.KeyEvents)
 		}
 		if err := store.CreateOutline(ctx, &outline); err != nil {
 			saveErrors = append(saveErrors, fmt.Sprintf("第%d条大纲保存失败: %v", i+1, err))

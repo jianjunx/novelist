@@ -133,13 +133,23 @@ func TestCreatorChatResponse_WithData(t *testing.T) {
 		Complete: true,
 		Data: &BrainstormData{
 			Characters: []CharacterData{
-				{Name: "张三", Role: "主角", Personality: "勇敢"},
+				{
+					Name:          "张三",
+					Role:          "主角",
+					Personality:   "勇敢",
+					Relationships: json.RawMessage(`[{"target":"李四","type":"朋友"}]`),
+				},
 			},
 			WorldSettings: []WorldSettingData{
 				{Category: "地理", Content: "大陆分为五块"},
 			},
 			Outlines: []OutlineData{
-				{Act: 1, ChapterNum: 1, Summary: "开篇"},
+				{
+					Act:        1,
+					ChapterNum: 1,
+					Summary:    "开篇",
+					KeyEvents:  json.RawMessage(`[{"event":"相遇","location":"青云宗","characters":["张三"]}]`),
+				},
 			},
 		},
 	}
@@ -162,6 +172,12 @@ func TestCreatorChatResponse_WithData(t *testing.T) {
 	}
 	if roundTrip.Data.Characters[0].Name != "张三" {
 		t.Errorf("CreatorChatResponse character name = %q, want %q", roundTrip.Data.Characters[0].Name, "张三")
+	}
+	if len(roundTrip.Data.Characters[0].Relationships) == 0 {
+		t.Error("CreatorChatResponse relationships should not be empty")
+	}
+	if len(roundTrip.Data.Outlines[0].KeyEvents) == 0 {
+		t.Error("CreatorChatResponse key_events should not be empty")
 	}
 }
 

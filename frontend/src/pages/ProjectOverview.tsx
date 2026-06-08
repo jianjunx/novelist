@@ -22,7 +22,7 @@ const anchors = [
 export default function ProjectOverview() {
   const { projectId } = useParams<{ projectId: string }>()
   const {
-    overview, isOverviewLoading, fetchOverview, fetchProject,
+    overview, isOverviewLoading, overviewError, fetchOverview, fetchProject,
     updateProjectOverview, createCharacter, updateCharacter, deleteCharacter,
     createWorldSetting, updateWorldSetting, deleteWorldSetting,
   } = useProjectStore()
@@ -35,7 +35,9 @@ export default function ProjectOverview() {
     }
   }, [projectId])
 
-  if (isOverviewLoading || !overview) {
+  const pid = projectId!
+
+  if (isOverviewLoading) {
     return (
       <div className="min-h-screen bg-parchment-gradient flex items-center justify-center">
         <div className="animate-pulse text-warm-gray font-literary">加载设定数据...</div>
@@ -43,8 +45,26 @@ export default function ProjectOverview() {
     )
   }
 
+  if (overviewError || !overview) {
+    return (
+      <div className="min-h-screen flex flex-col bg-parchment-gradient">
+        <ProjectNav projectId={pid} currentTab="overview" />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-ink-muted font-literary mb-4">{overviewError || '无法加载设定数据'}</p>
+            <button
+              onClick={() => fetchOverview(pid)}
+              className="px-6 py-3 bg-ink text-parchment rounded-lg hover:bg-ink-light transition-colors"
+            >
+              重试
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const locations = aggregateLocations(overview.world_settings, overview.outlines)
-  const pid = projectId!
 
   const handleProjectEdit = async (field: 'genre' | 'style_guide' | 'description', value: string) => {
     await updateProjectOverview(pid, { [field]: value })
@@ -68,7 +88,6 @@ export default function ProjectOverview() {
       />
 
       <div className="flex-1 max-w-[1400px] mx-auto w-full px-6 py-6 flex gap-6">
-        {/* Side anchor nav */}
         <aside className="hidden lg:block w-32 shrink-0 sticky top-24 self-start">
           <nav className="space-y-1">
             {anchors.map((a) => (

@@ -80,12 +80,15 @@ function normalizeOverview(data: ProjectOverview): ProjectOverview {
   }
 }
 
+let overviewFetchSeq = 0
+
 interface ProjectState {
   projects: Project[]
   currentProject: Project | null
   chapters: Chapter[]
   volumes: Volume[]
   overview: ProjectOverview | null
+  overviewError: string | null
   isLoading: boolean
   isOverviewLoading: boolean
   isGenerating: boolean
@@ -121,6 +124,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   chapters: [],
   volumes: [],
   overview: null,
+  overviewError: null,
   isLoading: false,
   isOverviewLoading: false,
   isGenerating: false,
@@ -137,12 +141,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ currentProject: data })
   },
   fetchOverview: async (projectId) => {
-    set({ isOverviewLoading: true })
+    const seq = ++overviewFetchSeq
+    set({ isOverviewLoading: true, overviewError: null, overview: null })
     try {
       const { data } = await api.get(`/projects/${projectId}/overview`)
-      set({ overview: normalizeOverview(data), isOverviewLoading: false })
+      if (seq !== overviewFetchSeq) return
+      set({ overview: normalizeOverview(data), isOverviewLoading: false, overviewError: null })
     } catch {
-      set({ isOverviewLoading: false })
+      if (seq !== overviewFetchSeq) return
+      set({ isOverviewLoading: false, overviewError: '加载设定数据失败', overview: null })
     }
   },
   fetchChapters: async (projectId) => {

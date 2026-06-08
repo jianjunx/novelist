@@ -24,6 +24,7 @@ func setupProjectRouter() *gin.Engine {
 	r.GET("/projects", GetProjects)
 	r.POST("/projects", CreateProject)
 	r.GET("/projects/:id", GetProject)
+	r.GET("/projects/:id/overview", GetProjectOverview)
 	r.PUT("/projects/:id", UpdateProject)
 	r.DELETE("/projects/:id", DeleteProject)
 	return r
@@ -257,5 +258,61 @@ func TestProject_Authorization(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("GetProject() other user's project status = %d, want %d", w.Code, http.StatusNotFound)
+	}
+}
+
+func TestGetProjectOverview_Success(t *testing.T) {
+	setupTestDBWithUUID(t)
+	r := setupProjectRouter()
+
+	p := createTestProject(t, "仪表盘项目")
+
+	outlineID := uuid.New()
+	volumeID := uuid.New()
+	store.GetDB().Create(&model.Volume{
+		ID: volumeID, ProjectID: p.ID, VolumeNum: 1, Title: "第一篇",
+	})
+	store.GetDB().Create(&model.Outline{
+		ID: outlineID, ProjectID: p.ID, VolumeID: &volumeID,
+		Act: 1, ChapterNum: 1, Summary: "开篇",
+	})
+	chapterID := uuid.New()
+	store.GetDB().Create(&model.Chapter{
+		ID: chapterID, ProjectID: p.ID, OutlineID: &outlineID,
+		ChapterNum: 1, Title: "第1章", Content: "正文", WordCount: 2,
+	})
+	store.GetDB().Create(&model.Character{
+		ID: uuid.New(), ProjectID: p.ID, Name: "主角", Role: "主角",
+	})
+	store.GetDB().Create(&model.WorldSetting{
+		ID: uuid.New(), ProjectID: p.ID, Category: "地点", Content: "青云宗",
+	})
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/projects/%s/overview", p.ShortID), nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("GetProjectOverview() status = %d, want %d; body: %s", w.Code, http.StatusOK, w.Body.String())
+	}
+
+	var resp ProjectOverview
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("GetProjectOverview() unmarshal failed: %v", err)
+	}
+	if resp.Stats.ChapterCount != 1 {
+		t.Errorf("GetProjectOverview() chapter_count = %d, want 1", resp.Stats.ChapterCount)
+	}
+	if resp.Stats.WrittenCount != 1 {
+		t.Errorf("GetProjectOverview() written_count = %d, want 1", resp.Stats.WrittenCount)
+	}
+	if resp.Stats.TotalWords != 2 {
+		t.Errorf("GetProjectOverview() total_words = %d, want 2", resp.Stats.TotalWords)
+	}
+	if len(resp.Outlines) != 1 || resp.Outlines[0].ChapterID == nil || *resp.Outlines[0].ChapterID != chapterID {
+		t.Error("GetProjectOverview() outline chapter_id mapping incorrect")
+	}
+	if len(resp.Characters) != 1 {
+		t.Errorf("GetProjectOverview() characters = %d, want 1", len(resp.Characters))
 	}
 }
