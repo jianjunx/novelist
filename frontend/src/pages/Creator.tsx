@@ -13,6 +13,7 @@ export default function Creator() {
   const { fetchProject } = useProjectStore()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const autoFixedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     if (projectId) {
@@ -38,11 +39,24 @@ export default function Creator() {
     const msg = input
     setInput('')
     await sendMessage(projectId, msg)
+    await autoFixIfNeeded()
   }
 
   const handleOptionClick = async (option: string) => {
     if (!projectId) return
     await sendMessage(projectId, option)
+    await autoFixIfNeeded()
+  }
+
+  const autoFixIfNeeded = async () => {
+    if (!projectId) return
+    const latest = useAgentStore.getState().messages
+    const lastMsg = latest[latest.length - 1]
+    if (!lastMsg || lastMsg.role !== 'agent') return
+    if (!needsOptions(lastMsg.content, lastMsg.options)) return
+    if (autoFixedRef.current.has(lastMsg.content)) return
+    autoFixedRef.current.add(lastMsg.content)
+    await sendMessage(projectId, `请重新按JSON格式返回以下内容，必须在options数组中提供多个选项（推荐的用⭐标记）：\n\n${lastMsg.content}`)
   }
 
   const needsOptions = (content: string, options?: string[]) => {
@@ -153,7 +167,7 @@ export default function Creator() {
                   </div>
                 )}
                 {/* Fix options button */}
-                {msg.role === 'agent' && i === messages.length - 1 && !isStreaming && needsOptions(msg.content, msg.options) && (
+                {msg.role === 'agent' && i === messages.length - 1 && !isStreaming && needsOptions(msg.content, msg.options) && autoFixedRef.current.has(msg.content) && (
                   <div className="mt-3">
                     <button
                       onClick={() => handleFixOptions(msg.content)}
