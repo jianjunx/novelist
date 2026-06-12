@@ -340,19 +340,6 @@ export default function ChapterList() {
                         选择
                       </button>
                     )}
-                    <button
-                      onClick={() => {
-                        setNewChapterVolumeId(latestVolume?.id || '')
-                        setNewChapterTitle('')
-                        setShowNewChapter(true)
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-sage hover:text-sage/80 bg-sage/5 hover:bg-sage/10 rounded transition-colors"
-                    >
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                      </svg>
-                      新增章节
-                    </button>
                   </>
                 )}
               </div>
@@ -383,6 +370,20 @@ export default function ChapterList() {
                         <span className="text-sm font-serif font-semibold text-ink flex-1 text-left">{vol.title}</span>
                         <span className="text-xs text-warm-gray">{volChapters.length}章</span>
                         {isLatest && <span className="text-xs px-1.5 py-0.5 bg-amber/10 text-amber-dark rounded">当前</span>}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setNewChapterVolumeId(vol.id)
+                            setNewChapterTitle('')
+                            setShowNewChapter(true)
+                          }}
+                          className="w-5 h-5 flex items-center justify-center rounded text-warm-gray hover:text-sage hover:bg-sage/10 transition-colors shrink-0"
+                          title={`在${vol.title}新增章节`}
+                        >
+                          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                          </svg>
+                        </button>
                       </button>
 
                       {/* Chapter list with drag-and-drop */}
@@ -788,7 +789,10 @@ export default function ChapterList() {
           >
             <h2 className="text-lg font-serif font-semibold text-ink mb-2">新增章节</h2>
             <p className="text-sm text-warm-gray mb-4">
-              {latestVolume ? `将添加到「${latestVolume.title}」` : '请输入章节标题'}
+              {(() => {
+                const targetVol = volumes.find(v => v.id === newChapterVolumeId)
+                return targetVol ? `将添加到「${targetVol.title}」` : '请输入章节标题'
+              })()}
             </p>
             <input
               type="text"

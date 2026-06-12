@@ -110,7 +110,7 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
       {/* Editor content */}
       <EditorContent
         editor={editor}
-        className="prose prose-lg max-w-none p-8 min-h-[500px] font-literary leading-loose focus:outline-none
+        className="max-w-none p-8 min-h-[500px] font-literary leading-loose focus:outline-none
           [&_.tiptap]:focus:outline-none
           [&_.tiptap]:min-h-[480px]
           [&_.tiptap_h2]:font-serif [&_.tiptap_h2]:text-2xl [&_.tiptap_h2]:font-bold [&_.tiptap_h2]:text-ink [&_.tiptap_h2]:mt-8 [&_.tiptap_h2]:mb-4
@@ -131,8 +131,7 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
           [&_.tiptap_p.is-editor-empty:first-child::before]:h-0
           [&_.tiptap_pre]:bg-parchment-dark [&_.tiptap_pre]:rounded-lg [&_.tiptap_pre]:p-4 [&_.tiptap_pre]:my-4 [&_.tiptap_pre]:overflow-x-auto
           [&_.tiptap_pre_code]:bg-transparent [&_.tiptap_pre_code]:p-0 [&_.tiptap_pre_code]:text-sm [&_.tiptap_pre_code]:font-mono
-          [&_.tiptap_code]:bg-parchment-dark [&_.tiptap_code]:px-1.5 [&_.tiptap_code]:py-0.5 [&_.tiptap_code]:rounded [&_.tiptap_code]:text-sm [&_.tiptap_code]:font-mono
-          [&_.tiptap_pre_.tiptap_code]:bg-transparent [&_.tiptap_pre_.tiptap_code]:p-0 [&_.tiptap_pre_.tiptap_code]:text-sm"
+          [&_.tiptap_code]:bg-parchment-dark [&_.tiptap_code]:px-1.5 [&_.tiptap_code]:py-0.5 [&_.tiptap_code]:rounded [&_.tiptap_code]:text-sm [&_.tiptap_code]:font-mono"
       />
     </div>
   )
