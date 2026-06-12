@@ -35,9 +35,9 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
     ],
     content,
     onUpdate: ({ editor }) => {
-      const md = (editor.storage as any).markdown.getMarkdown()
-      lastExternalContent.current = md
-      onChange(md)
+      const html = editor.getHTML()
+      lastExternalContent.current = html
+      onChange(html)
     },
   })
 
