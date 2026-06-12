@@ -5,8 +5,17 @@ import type { ReviewResult } from '../stores/projectStore'
 import ProjectNav from '../components/ProjectNav'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import rehypeRaw from 'rehype-raw'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
+
+/** Detect if content is HTML (from new saves) vs markdown (legacy) */
+function isHtmlContent(text: string): boolean {
+  const s = text.trim()
+  return s.startsWith('<') && (
+    s.includes('<p>') || s.includes('<h1') || s.includes('<h2') || s.includes('<h3') ||
+    s.includes('<pre>') || s.includes('<ul>') || s.includes('<ol>') ||
+    s.includes('<blockquote>') || s.includes('<hr') || s.includes('<div>')
+  )
+}
 
 export default function ChapterList() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -669,7 +678,11 @@ export default function ChapterList() {
                       [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mb-4
                       [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:mb-4
                       [&>li]:text-ink-light [&>li]:mb-1">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{selected.content}</ReactMarkdown>
+                      {isHtmlContent(selected.content) ? (
+                        <div dangerouslySetInnerHTML={{ __html: selected.content }} />
+                      ) : (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{selected.content}</ReactMarkdown>
+                      )}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center h-64 text-center">

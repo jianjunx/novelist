@@ -1,7 +1,6 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Markdown } from 'tiptap-markdown'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 
 export interface TipTapEditorHandle {
@@ -19,19 +18,12 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
   { content, onChange, placeholder = '开始写作...' },
   ref
 ) {
-  // Track the last content we received from outside (not from our own onChange)
-  // to avoid unnecessary round-trips through the markdown parser/serializer
   const lastExternalContent = useRef(content)
 
   const editor = useEditor({
     extensions: [
       StarterKit,
       Placeholder.configure({ placeholder }),
-      Markdown.configure({
-        html: false,
-        transformPastedText: true,
-        transformCopiedText: true,
-      }),
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -42,8 +34,6 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
   })
 
   // Only sync content when it changes from an external source
-  // (e.g., server load, discussion panel apply), not from our own edits.
-  // This prevents the markdown round-trip from degrading content (losing blank lines).
   useEffect(() => {
     if (editor && content !== lastExternalContent.current) {
       editor.commands.setContent(content)
