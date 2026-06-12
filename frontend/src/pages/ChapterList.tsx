@@ -400,6 +400,7 @@ export default function ChapterList() {
                                     <div
                                       ref={dragProvided.innerRef}
                                       {...dragProvided.draggableProps}
+                                      {...dragProvided.dragHandleProps}
                                       className={snapshot.isDragging ? 'opacity-90 scale-[1.02] shadow-lg rounded-lg z-10' : ''}
                                     >
                                       <ChapterItem
@@ -417,7 +418,6 @@ export default function ChapterList() {
                                         onEditSave={handleInlineEditSave}
                                         onEditCancel={handleInlineEditCancel}
                                         onEditingTitleChange={setEditingTitle}
-                                        dragHandleProps={dragProvided.dragHandleProps}
                                       />
                                     </div>
                                   )}
@@ -449,6 +449,7 @@ export default function ChapterList() {
                                 <div
                                   ref={dragProvided.innerRef}
                                   {...dragProvided.draggableProps}
+                                  {...dragProvided.dragHandleProps}
                                   className={snapshot.isDragging ? 'opacity-90 scale-[1.02] shadow-lg rounded-lg z-10' : ''}
                                 >
                                   <ChapterItem
@@ -466,7 +467,6 @@ export default function ChapterList() {
                                     onEditSave={handleInlineEditSave}
                                     onEditCancel={handleInlineEditCancel}
                                     onEditingTitleChange={setEditingTitle}
-                                    dragHandleProps={dragProvided.dragHandleProps}
                                   />
                                 </div>
                               )}
@@ -829,7 +829,7 @@ export default function ChapterList() {
   )
 }
 
-function ChapterItem({ ch, isActive, onSelect, onDelete, isDeleting, selectMode, isSelected, onToggleSelect, editingChapterId, editingTitle, onEditStart, onEditSave, onEditCancel, onEditingTitleChange, dragHandleProps }: {
+function ChapterItem({ ch, isActive, onSelect, onDelete, isDeleting, selectMode, isSelected, onToggleSelect, editingChapterId, editingTitle, onEditStart, onEditSave, onEditCancel, onEditingTitleChange }: {
   ch: { id: string; chapter_num: number; title: string; content: string; can_generate: boolean }
   isActive: boolean
   onSelect: () => void
@@ -844,7 +844,6 @@ function ChapterItem({ ch, isActive, onSelect, onDelete, isDeleting, selectMode,
   onEditSave: () => void
   onEditCancel: () => void
   onEditingTitleChange: (title: string) => void
-  dragHandleProps?: Record<string, any> | null
 }) {
   const hasContent = ch.content && ch.content.length > 0
   const isEditing = editingChapterId === ch.id
@@ -875,24 +874,6 @@ function ChapterItem({ ch, isActive, onSelect, onDelete, isDeleting, selectMode,
               </svg>
             )}
           </div>
-        </div>
-      )}
-      {/* Drag handle (only in non-select mode) */}
-      {!selectMode && dragHandleProps && (
-        <div
-          {...dragHandleProps}
-          className="shrink-0 cursor-grab active:cursor-grabbing text-warm-gray hover:text-ink transition-colors px-0.5"
-          title="拖拽排序"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="8" cy="4" r="1.5" />
-            <circle cx="16" cy="4" r="1.5" />
-            <circle cx="8" cy="10" r="1.5" />
-            <circle cx="16" cy="10" r="1.5" />
-            <circle cx="8" cy="16" r="1.5" />
-            <circle cx="16" cy="16" r="1.5" />
-          </svg>
         </div>
       )}
       <span className={`inline-flex items-center justify-center w-6 h-6 rounded text-xs font-serif font-semibold shrink-0 ${

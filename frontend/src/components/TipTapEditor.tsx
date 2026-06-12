@@ -78,6 +78,9 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
     { icon: '"', action: () => editor.chain().focus().toggleBlockquote().run(), active: editor.isActive('blockquote'), title: '引用' },
     { label: '•', action: () => editor.chain().focus().toggleBulletList().run(), active: editor.isActive('bulletList'), title: '无序列表' },
     { label: '1.', action: () => editor.chain().focus().toggleOrderedList().run(), active: editor.isActive('orderedList'), title: '有序列表' },
+    { divider: true },
+    { label: '</>', action: () => editor.chain().focus().toggleCodeBlock().run(), active: editor.isActive('codeBlock'), title: '代码块' },
+    { label: '<>', action: () => editor.chain().focus().toggleCode().run(), active: editor.isActive('code'), title: '行内代码' },
   ]
 
   return (
@@ -125,7 +128,11 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
           [&_.tiptap_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]
           [&_.tiptap_p.is-editor-empty:first-child::before]:float-left
           [&_.tiptap_p.is-editor-empty:first-child::before]:pointer-events-none
-          [&_.tiptap_p.is-editor-empty:first-child::before]:h-0"
+          [&_.tiptap_p.is-editor-empty:first-child::before]:h-0
+          [&_.tiptap_pre]:bg-parchment-dark [&_.tiptap_pre]:rounded-lg [&_.tiptap_pre]:p-4 [&_.tiptap_pre]:my-4 [&_.tiptap_pre]:overflow-x-auto
+          [&_.tiptap_pre_code]:bg-transparent [&_.tiptap_pre_code]:p-0 [&_.tiptap_pre_code]:text-sm [&_.tiptap_pre_code]:font-mono
+          [&_.tiptap_code]:bg-parchment-dark [&_.tiptap_code]:px-1.5 [&_.tiptap_code]:py-0.5 [&_.tiptap_code]:rounded [&_.tiptap_code]:text-sm [&_.tiptap_code]:font-mono
+          [&_.tiptap_pre_.tiptap_code]:bg-transparent [&_.tiptap_pre_.tiptap_code]:p-0 [&_.tiptap_pre_.tiptap_code]:text-sm"
       />
     </div>
   )
