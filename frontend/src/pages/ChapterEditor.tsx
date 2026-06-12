@@ -165,7 +165,7 @@ export default function ChapterEditor() {
         <div className="max-w-5xl mx-auto px-6 py-3 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate(`/projects/${chapter.project_id}/chapters`, { state: { selectedChapterId: chapterId } })}
               className="w-8 h-8 rounded-lg bg-parchment-dark flex items-center justify-center text-ink-muted hover:text-ink hover:bg-parchment-deep transition-colors"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

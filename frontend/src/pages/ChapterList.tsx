@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useProjectStore } from '../stores/projectStore'
 import type { ReviewResult } from '../stores/projectStore'
 import ProjectNav from '../components/ProjectNav'
@@ -20,6 +20,7 @@ function isHtmlContent(text: string): boolean {
 export default function ChapterList() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const {
     currentProject, chapters, volumes, isLoading, isGenerating, isReviewing, isExpanding,
     reviewResult, fetchProject, fetchChapters, fetchVolumes, generateChapter,
@@ -72,7 +73,13 @@ export default function ChapterList() {
   // Auto-select first chapter when chapters load
   useEffect(() => {
     if (chapters.length > 0 && !selectedId) {
-      setSelectedId(chapters[0].id)
+      const fromEditor = (location.state as any)?.selectedChapterId
+      if (fromEditor && chapters.find(c => c.id === fromEditor)) {
+        setSelectedId(fromEditor)
+      } else {
+        setSelectedId(chapters[0].id)
+      }
+      window.history.replaceState({}, '')
     }
   }, [chapters])
 
@@ -672,6 +679,7 @@ export default function ChapterList() {
                   {selectedHasContent ? (
                     <div className="prose prose-sm max-w-none font-literary leading-relaxed
                       [&>p]:mb-4 [&>p]:leading-relaxed [&>p]:text-ink-light
+                      [&>br]:block
                       [&>h2]:font-serif [&>h2]:text-2xl [&>h2]:font-bold [&>h2]:text-ink [&>h2]:mt-8 [&>h2]:mb-4
                       [&>h3]:font-serif [&>h3]:text-xl [&>h3]:font-semibold [&>h3]:text-ink [&>h3]:mt-6 [&>h3]:mb-3
                       [&>blockquote]:border-l-4 [&>blockquote]:border-amber/40 [&>blockquote]:pl-4 [&>blockquote]:italic [&>blockquote]:text-ink-muted

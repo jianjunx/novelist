@@ -100,7 +100,7 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
       {/* Editor content */}
       <EditorContent
         editor={editor}
-        className="max-w-none p-8 min-h-[500px] font-literary leading-loose focus:outline-none
+        className="max-w-none p-8 min-h-[500px] text-sm leading-relaxed font-literary focus:outline-none
           [&_.tiptap]:focus:outline-none
           [&_.tiptap]:min-h-[480px]
           [&_.tiptap_h2]:font-serif [&_.tiptap_h2]:text-2xl [&_.tiptap_h2]:font-bold [&_.tiptap_h2]:text-ink [&_.tiptap_h2]:mt-8 [&_.tiptap_h2]:mb-4
