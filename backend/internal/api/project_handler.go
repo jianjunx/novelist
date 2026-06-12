@@ -58,6 +58,9 @@ func GetProjects(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch projects"})
 		return
 	}
+	if results == nil {
+		results = []ProjectWithStatus{}
+	}
 	c.JSON(http.StatusOK, results)
 }
 
@@ -111,10 +114,15 @@ func UpdateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	store.GetDB().Model(&project).Updates(map[string]interface{}{
+	if err := store.GetDB().Model(project).Updates(map[string]interface{}{
 		"title": req.Title, "genre": req.Genre,
 		"description": req.Description, "style_guide": req.StyleGuide,
-	})
+	}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update project"})
+		return
+	}
+	// Re-fetch from DB to ensure the response reflects persisted values
+	store.GetDB().Where("id = ?", project.ID).First(project)
 	c.JSON(http.StatusOK, project)
 }
 
@@ -168,15 +176,27 @@ func GetProjectOverview(c *gin.Context) {
 
 	var characters []model.Character
 	store.GetDB().Where("project_id = ?", project.ID).Find(&characters)
+	if characters == nil {
+		characters = []model.Character{}
+	}
 
 	var worldSettings []model.WorldSetting
 	store.GetDB().Where("project_id = ?", project.ID).Find(&worldSettings)
+	if worldSettings == nil {
+		worldSettings = []model.WorldSetting{}
+	}
 
 	var outlines []model.Outline
 	store.GetDB().Where("project_id = ?", project.ID).Order("act, chapter_num").Find(&outlines)
+	if outlines == nil {
+		outlines = []model.Outline{}
+	}
 
 	var chapters []model.Chapter
 	store.GetDB().Where("project_id = ?", project.ID).Find(&chapters)
+	if chapters == nil {
+		chapters = []model.Chapter{}
+	}
 
 	chapterByOutline := make(map[uuid.UUID]uuid.UUID)
 	var stats ProjectStats

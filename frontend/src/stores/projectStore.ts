@@ -102,12 +102,18 @@ interface ProjectState {
   fetchVolumes: (projectId: string) => Promise<void>
   createProject: (d: Partial<Project>) => Promise<Project>
   createVolume: (projectId: string) => Promise<Volume>
+  createChapter: (projectId: string, data: { title: string; chapter_num: number; content?: string }) => Promise<Chapter>
+  reorderChapters: (projectId: string, chapterIds: string[]) => Promise<void>
   generateChapter: (chapterId: string) => Promise<ReviewResult>
   reviewAndRevise: (chapterId: string) => Promise<ReviewResult>
   expandOutlines: (projectId: string) => Promise<{ volume_complete: boolean }>
   deleteProject: (projectId: string) => Promise<void>
+  deleteChapter: (chapterId: string) => Promise<void>
+  batchDeleteChapters: (projectId: string, chapterIds: string[]) => Promise<void>
+  updateChapterTitle: (chapterId: string, title: string) => Promise<void>
   updateProject: (projectId: string, data: Partial<Project>) => Promise<void>
   updateProjectOverview: (projectId: string, data: Partial<Pick<Project, 'genre' | 'description' | 'style_guide' | 'title'>>) => Promise<void>
+  manualRevise: (chapterId: string, feedback: string) => Promise<string>
   createCharacter: (projectId: string, data: Omit<Character, 'id' | 'project_id' | 'created_at'>) => Promise<void>
   updateCharacter: (id: string, data: Partial<Character>) => Promise<void>
   deleteCharacter: (id: string) => Promise<void>
@@ -170,6 +176,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ volumes: [...get().volumes, data] })
     return data
   },
+  createChapter: async (projectId, data) => {
+    const { data: created } = await api.post(`/projects/${projectId}/chapters`, data)
+    await get().fetchChapters(projectId)
+    return created
+  },
+  reorderChapters: async (projectId, chapterIds) => {
+    await api.post(`/projects/${projectId}/chapters/reorder`, { chapter_ids: chapterIds })
+    await get().fetchChapters(projectId)
+  },
   generateChapter: async (chapterId) => {
     set({ isGenerating: true, reviewResult: null })
     try {
@@ -214,6 +229,26 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     await api.delete(`/projects/${projectId}`)
     set({ projects: get().projects.filter((p) => p.id !== projectId && p.short_id !== projectId) })
   },
+  deleteChapter: async (chapterId) => {
+    await api.delete(`/chapters/${chapterId}`)
+    set({ chapters: get().chapters.filter((ch) => ch.id !== chapterId) })
+    const currentProject = get().currentProject
+    if (currentProject) {
+      await get().fetchChapters(currentProject.short_id)
+    }
+  },
+  batchDeleteChapters: async (projectId, chapterIds) => {
+    await api.post(`/projects/${projectId}/chapters/batch-delete`, { chapter_ids: chapterIds })
+    set({ chapters: get().chapters.filter((ch) => !chapterIds.includes(ch.id)) })
+  },
+  updateChapterTitle: async (chapterId, title) => {
+    await api.put(`/chapters/${chapterId}`, { title })
+    set({
+      chapters: get().chapters.map((ch) =>
+        ch.id === chapterId ? { ...ch, title } : ch
+      ),
+    })
+  },
   updateProject: async (projectId, data) => {
     const { data: updated } = await api.put(`/projects/${projectId}`, data)
     set({
@@ -227,7 +262,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const current = get().overview
     if (!current) return
     const payload = {
-      title: current.project.title,
+      title: data.title ?? current.project.title,
       genre: data.genre ?? current.project.genre,
       description: data.description ?? current.project.description,
       style_guide: data.style_guide ?? current.project.style_guide,
@@ -242,6 +277,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ? { ...get().currentProject!, ...data }
         : get().currentProject,
     })
+  },
+  manualRevise: async (chapterId, feedback) => {
+    set({ isReviewing: true })
+    try {
+      const { data } = await api.post(`/chapters/${chapterId}/manual-revise`, { feedback })
+      const currentProject = get().currentProject
+      if (currentProject) {
+        await get().fetchChapters(currentProject.short_id)
+      }
+      return data.revised_content
+    } finally {
+      set({ isReviewing: false })
+    }
   },
   createCharacter: async (projectId, data) => {
     const { data: created } = await api.post(`/projects/${projectId}/characters`, {

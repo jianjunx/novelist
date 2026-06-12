@@ -27,6 +27,9 @@ func GetAvailableModels(c *gin.Context) {
 	}
 
 	var models []gin.H
+	if models == nil {
+		models = []gin.H{}
+	}
 	if settings.DeepSeekKey != "" {
 		models = append(models,
 			gin.H{"value": "deepseek-chat", "label": "DeepSeek Chat", "provider": "deepseek"},

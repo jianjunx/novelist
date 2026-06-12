@@ -17,5 +17,8 @@ func GetConversations(c *gin.Context) {
 	}
 	var conversations []model.Conversation
 	store.GetDB().Where("project_id = ?", project.ID).Order("created_at ASC").Find(&conversations)
+	if conversations == nil {
+		conversations = []model.Conversation{}
+	}
 	c.JSON(http.StatusOK, conversations)
 }

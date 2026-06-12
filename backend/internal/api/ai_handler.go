@@ -243,6 +243,31 @@ func ApplyFeedback(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"revised_content": revised})
 }
 
+// ManualReviseChapter revises chapter content based on human feedback
+func ManualReviseChapter(c *gin.Context) {
+	chapterID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chapter ID"})
+		return
+	}
+
+	var req struct {
+		Feedback string `json:"feedback" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	revised, err := orch.ManualRevise(c.Request.Context(), chapterID, req.Feedback)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"revised_content": revised})
+}
+
 // ExpandOutlines generates additional chapter outlines for a project
 func ExpandOutlines(c *gin.Context) {
 	userID, _ := c.Get("user_id")

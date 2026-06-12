@@ -17,6 +17,9 @@ func GetWorldSettings(c *gin.Context) {
 	}
 	var settings []model.WorldSetting
 	store.GetDB().Where("project_id = ?", project.ID).Find(&settings)
+	if settings == nil {
+		settings = []model.WorldSetting{}
+	}
 	c.JSON(http.StatusOK, settings)
 }
 
@@ -50,7 +53,7 @@ func CreateWorldSetting(c *gin.Context) {
 func UpdateWorldSetting(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	var setting model.WorldSetting
-	if err := store.GetDB().Joins("Project").Where("world_settings.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&setting).Error; err != nil {
+	if err := store.GetDB().Where("world_settings.id = ? AND world_settings.project_id IN (SELECT id FROM projects WHERE user_id = ?)", c.Param("id"), userID).First(&setting).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Setting not found"})
 		return
 	}
@@ -75,7 +78,7 @@ func UpdateWorldSetting(c *gin.Context) {
 func DeleteWorldSetting(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	var setting model.WorldSetting
-	if err := store.GetDB().Joins("Project").Where("world_settings.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&setting).Error; err != nil {
+	if err := store.GetDB().Where("world_settings.id = ? AND world_settings.project_id IN (SELECT id FROM projects WHERE user_id = ?)", c.Param("id"), userID).First(&setting).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "World setting not found"})
 		return
 	}

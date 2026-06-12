@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@tiptap/extension-placeholder": "^3.26.0",
     "@tiptap/react": "^3.26.0",
     "@tiptap/starter-kit": "^3.26.0",
+    "@types/react-beautiful-dnd": "^13.1.8",
     "@xyflow/react": "^12.11.0",
     "axios": "^1.17.0",
     "react": "^19.2.6",

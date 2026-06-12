@@ -60,7 +60,7 @@ func CreateOutline(c *gin.Context) {
 func UpdateOutline(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	var outline model.Outline
-	if err := store.GetDB().Joins("Project").Where("outlines.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&outline).Error; err != nil {
+	if err := store.GetDB().Where("outlines.id = ? AND outlines.project_id IN (SELECT id FROM projects WHERE user_id = ?)", c.Param("id"), userID).First(&outline).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Outline not found"})
 		return
 	}
@@ -97,7 +97,7 @@ func UpdateOutline(c *gin.Context) {
 func DeleteOutline(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	var outline model.Outline
-	if err := store.GetDB().Joins("Project").Where("outlines.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&outline).Error; err != nil {
+	if err := store.GetDB().Where("outlines.id = ? AND outlines.project_id IN (SELECT id FROM projects WHERE user_id = ?)", c.Param("id"), userID).First(&outline).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Outline not found"})
 		return
 	}

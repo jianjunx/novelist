@@ -37,6 +37,9 @@ func GetCharacters(c *gin.Context) {
 	}
 	var characters []model.Character
 	store.GetDB().Where("project_id = ?", project.ID).Find(&characters)
+	if characters == nil {
+		characters = []model.Character{}
+	}
 	c.JSON(http.StatusOK, characters)
 }
 
@@ -75,7 +78,7 @@ func CreateCharacter(c *gin.Context) {
 func UpdateCharacter(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	var character model.Character
-	if err := store.GetDB().Joins("Project").Where("characters.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&character).Error; err != nil {
+	if err := store.GetDB().Where("characters.id = ? AND characters.project_id IN (SELECT id FROM projects WHERE user_id = ?)", c.Param("id"), userID).First(&character).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Character not found"})
 		return
 	}
@@ -109,7 +112,7 @@ func UpdateCharacter(c *gin.Context) {
 func DeleteCharacter(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	var character model.Character
-	if err := store.GetDB().Joins("Project").Where("characters.id = ? AND projects.user_id = ?", c.Param("id"), userID).First(&character).Error; err != nil {
+	if err := store.GetDB().Where("characters.id = ? AND characters.project_id IN (SELECT id FROM projects WHERE user_id = ?)", c.Param("id"), userID).First(&character).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Character not found"})
 		return
 	}

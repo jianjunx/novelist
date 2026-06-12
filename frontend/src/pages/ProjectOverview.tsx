@@ -23,7 +23,8 @@ export default function ProjectOverview() {
   const { projectId } = useParams<{ projectId: string }>()
   const {
     overview, isOverviewLoading, overviewError, fetchOverview, fetchProject,
-    updateProjectOverview, createCharacter, updateCharacter, deleteCharacter,
+    updateProjectOverview,
+    createCharacter, updateCharacter, deleteCharacter,
     createWorldSetting, updateWorldSetting, deleteWorldSetting,
   } = useProjectStore()
   const [editing, setEditing] = useState(false)
@@ -36,6 +37,10 @@ export default function ProjectOverview() {
   }, [projectId])
 
   const pid = projectId!
+
+  const handleProjectEdit = (data: { genre?: string; style_guide?: string; description?: string }) => {
+    updateProjectOverview(pid, data)
+  }
 
   if (isOverviewLoading) {
     return (
@@ -66,9 +71,7 @@ export default function ProjectOverview() {
 
   const locations = aggregateLocations(overview.world_settings, overview.outlines)
 
-  const handleProjectEdit = async (field: 'genre' | 'style_guide' | 'description', value: string) => {
-    await updateProjectOverview(pid, { [field]: value })
-  }
+
 
   return (
     <div className="min-h-screen flex flex-col bg-parchment-gradient">

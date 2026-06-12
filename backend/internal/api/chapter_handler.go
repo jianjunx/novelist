@@ -83,6 +83,9 @@ func GetChapters(c *gin.Context) {
 		}
 		results = append(results, cwo)
 	}
+	if results == nil {
+		results = []ChapterWithOutline{}
+	}
 	c.JSON(http.StatusOK, results)
 }
 
@@ -158,6 +161,74 @@ func UpdateChapter(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, chapter)
+}
+
+func BatchDeleteChapters(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+	var req struct {
+		ChapterIDs []string `json:"chapter_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(req.ChapterIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "chapter_ids is required"})
+		return
+	}
+	// Verify all chapters belong to this project and user
+	var chapters []model.Chapter
+	store.GetDB().Where("id IN ? AND project_id = ?", req.ChapterIDs, project.ID).Find(&chapters)
+	if len(chapters) != len(req.ChapterIDs) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Some chapters not found or do not belong to this project"})
+		return
+	}
+	store.GetDB().Where("id IN ?", req.ChapterIDs).Delete(&model.Chapter{})
+	c.JSON(http.StatusOK, gin.H{"message": "Chapters deleted", "deleted_count": len(chapters)})
+}
+
+func ReorderChapters(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	project, err := findProjectByParam(c.Param("id"), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+	var req struct {
+		ChapterIDs []string `json:"chapter_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(req.ChapterIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "chapter_ids is required"})
+		return
+	}
+	// Verify all chapters belong to this project and user
+	var chapters []model.Chapter
+	store.GetDB().Where("id IN ? AND project_id = ?", req.ChapterIDs, project.ID).Find(&chapters)
+	if len(chapters) != len(req.ChapterIDs) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Some chapters not found or do not belong to this project"})
+		return
+	}
+	// Build a map for quick lookup and update chapter_num based on the new order
+	chapterMap := make(map[uuid.UUID]model.Chapter)
+	for _, ch := range chapters {
+		chapterMap[ch.ID] = ch
+	}
+	for i, idStr := range req.ChapterIDs {
+		id := uuid.MustParse(idStr)
+		if ch, ok := chapterMap[id]; ok {
+			store.GetDB().Model(&ch).Update("chapter_num", i+1)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Chapters reordered"})
 }
 
 func DeleteChapter(c *gin.Context) {

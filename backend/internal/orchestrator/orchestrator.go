@@ -815,6 +815,36 @@ func (o *Orchestrator) ApplyFeedback(ctx context.Context, chapterID uuid.UUID, d
 	return revised, nil
 }
 
+// ManualRevise revises chapter content based on human feedback directly.
+// It skips the discussion phase and passes the human feedback directly to the Reviser agent.
+func (o *Orchestrator) ManualRevise(ctx context.Context, chapterID uuid.UUID, feedback string) (string, error) {
+	var chapter model.Chapter
+	if err := store.GetDB().Where("id = ?", chapterID).First(&chapter).Error; err != nil {
+		return "", fmt.Errorf("chapter not found: %w", err)
+	}
+	if chapter.Content == "" {
+		return "", fmt.Errorf("chapter has no content to revise")
+	}
+
+	prompt := fmt.Sprintf("请根据以下人工评审意见修改章节内容。\n\n评审意见：\n%s\n\n原文：\n%s", feedback, chapter.Content)
+	messages := []ai.Message{{Role: "user", Content: prompt}}
+
+	revised, err := agent.Chat(ctx, agent.RoleReviser, messages)
+	if err != nil {
+		return "", err
+	}
+
+	// Save revised content
+	if err := store.UpdateChapter(ctx, chapterID, map[string]interface{}{
+		"content":    revised,
+		"word_count": utf8.RuneCountInString(revised),
+	}); err != nil {
+		return "", fmt.Errorf("failed to save revised content: %w", err)
+	}
+
+	return revised, nil
+}
+
 func formatDiscussionSummary(result *DiscussionResult) string {
 	if result == nil {
 		return ""
