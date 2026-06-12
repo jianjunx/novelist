@@ -33,7 +33,6 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
     },
   })
 
-  // Only sync content when it changes from an external source
   useEffect(() => {
     if (editor && content !== lastExternalContent.current) {
       editor.commands.setContent(content)
@@ -97,15 +96,15 @@ const TipTapEditor = forwardRef<TipTapEditorHandle, TipTapEditorProps>(function 
         )}
       </div>
 
-      {/* Editor content */}
+      {/* Editor content — markdown-style: monospace, larger font, clean lines */}
       <EditorContent
         editor={editor}
-        className="max-w-none p-8 min-h-[500px] text-sm leading-relaxed font-literary focus:outline-none
+        className="max-w-none p-8 min-h-[500px] focus:outline-none font-mono text-base leading-[1.8] tracking-wide
           [&_.tiptap]:focus:outline-none
           [&_.tiptap]:min-h-[480px]
           [&_.tiptap_h2]:font-serif [&_.tiptap_h2]:text-2xl [&_.tiptap_h2]:font-bold [&_.tiptap_h2]:text-ink [&_.tiptap_h2]:mt-8 [&_.tiptap_h2]:mb-4
           [&_.tiptap_h3]:font-serif [&_.tiptap_h3]:text-xl [&_.tiptap_h3]:font-semibold [&_.tiptap_h3]:text-ink [&_.tiptap_h3]:mt-6 [&_.tiptap_h3]:mb-3
-          [&_.tiptap_p]:text-ink-light [&_.tiptap_p]:leading-relaxed [&_.tiptap_p]:mb-4
+          [&_.tiptap_p]:text-ink-light [&_.tiptap_p]:mb-5
           [&_.tiptap_strong]:text-ink [&_.tiptap_strong]:font-semibold
           [&_.tiptap_em]:text-ink-muted
           [&_.tiptap_blockquote]:border-l-4 [&_.tiptap_blockquote]:border-amber/40 [&_.tiptap_blockquote]:pl-4 [&_.tiptap_blockquote]:italic [&_.tiptap_blockquote]:text-ink-muted

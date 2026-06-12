@@ -62,13 +62,22 @@ export default function ChapterList() {
     return () => clearReviewResult()
   }, [projectId])
 
-  // Auto-expand the latest volume
+  // Auto-expand volumes: from editor return > latest volume
   useEffect(() => {
     if (volumes.length > 0 && expandedVolumes.size === 0) {
+      const fromEditor = (location.state as any)?.selectedChapterId
+      if (fromEditor) {
+        // Find the chapter and expand its volume
+        const ch = chapters.find(c => c.id === fromEditor)
+        if (ch?.volume_id) {
+          setExpandedVolumes(new Set([ch.volume_id]))
+          return
+        }
+      }
       const latest = volumes[volumes.length - 1]
       setExpandedVolumes(new Set([latest.id]))
     }
-  }, [volumes])
+  }, [volumes, chapters])
 
   // Auto-select first chapter when chapters load
   useEffect(() => {
