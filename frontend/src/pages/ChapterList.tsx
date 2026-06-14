@@ -64,25 +64,27 @@ export default function ChapterList() {
 
   // Auto-expand volumes: from editor return > latest volume
   useEffect(() => {
-    if (volumes.length > 0 && expandedVolumes.size === 0) {
-      const fromEditor = (location.state as any)?.selectedChapterId
-      if (fromEditor) {
-        // Find the chapter and expand its volume
-        const ch = chapters.find(c => c.id === fromEditor)
-        if (ch?.volume_id) {
-          setExpandedVolumes(new Set([ch.volume_id]))
-          return
-        }
+    if (volumes.length === 0 || expandedVolumes.size > 0) return
+
+    const fromEditor = (location.state as { selectedChapterId?: string })?.selectedChapterId
+    if (fromEditor) {
+      // Wait for chapters to load before resolving the target volume
+      if (chapters.length === 0) return
+      const ch = chapters.find(c => c.id === fromEditor)
+      if (ch?.volume_id) {
+        setExpandedVolumes(new Set([ch.volume_id]))
+        return
       }
-      const latest = volumes[volumes.length - 1]
-      setExpandedVolumes(new Set([latest.id]))
     }
+    // No fromEditor, or chapter not found — expand latest volume
+    const latest = volumes[volumes.length - 1]
+    setExpandedVolumes(new Set([latest.id]))
   }, [volumes, chapters])
 
   // Auto-select first chapter when chapters load
   useEffect(() => {
     if (chapters.length > 0 && !selectedId) {
-      const fromEditor = (location.state as any)?.selectedChapterId
+      const fromEditor = (location.state as { selectedChapterId?: string })?.selectedChapterId
       if (fromEditor && chapters.find(c => c.id === fromEditor)) {
         setSelectedId(fromEditor)
       } else {
